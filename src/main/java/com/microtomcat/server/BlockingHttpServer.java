@@ -1,11 +1,11 @@
 package com.microtomcat.server;
 
+import com.microtomcat.connector.Request;
+import com.microtomcat.connector.Response;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -14,7 +14,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
-        this.executorService = Executors.newFixedThreadPool(10); // Using default thread pool size since getter is not defined
+        this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
     }
 
     @Override
@@ -38,104 +38,29 @@ public class BlockingHttpServer extends AbstractHttpServer {
     }
     
     protected void handleRequest(Socket socket) {
-        try (
-             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             OutputStream outputStream = socket.getOutputStream()) {
+        try (InputStream input = socket.getInputStream();
+             OutputStream output = socket.getOutputStream()) {
             
-            // Read the request line
-            String requestLine = reader.readLine();
-            if (requestLine == null) {
-                return;
-            }
-
-            // Parse request line
-            String[] requestParts = requestLine.split(" ");
-            if (requestParts.length != 3) {
-                sendError(outputStream, 400, "Bad Request");
-                return;
-            }
-
-            String method = requestParts[0];
-            String path = requestParts[1];
+            // Create and parse request
+            Request request = new Request(input);
+            request.parse();
             
-            // Currently only handling GET requests
-            if (!"GET".equals(method)) {
-                sendError(outputStream, 405, "Method Not Allowed");
-                return;
-            }
-
-            // Serve the file
-            serveFile(path, outputStream);
-
+            // Log request details
+            log(String.format("Received %s request for URI: %s", 
+                request.getMethod(), request.getUri()));
+            
+            // Create and send response
+            Response response = new Response(output, request);
+            response.sendStaticResource();
+            
         } catch (IOException e) {
             log("Error handling request: " + e.getMessage());
-        }
-    }
-
-
-    private void serveFile(String requestPath, OutputStream outputStream) throws IOException {
-        String filePath = config.getWebRoot() + requestPath;
-        Path path = Paths.get(filePath);
-        
-        if (!Files.exists(path)) {
-            sendError(outputStream, 404, "Not Found");
-            return;
-        }
-
-        byte[] fileContent = Files.readAllBytes(path);
-        String contentType = getContentType(path);
-        
-        String response = "HTTP/1.1 200 OK\r\n" +
-                         "Content-Type: " + contentType + "; charset=UTF-8\r\n" +
-                         "Content-Length: " + fileContent.length + "\r\n" +
-                         "\r\n";
-        
-        outputStream.write(response.getBytes());
-        outputStream.write(fileContent);
-        outputStream.flush();
-    }
-
-    private String getContentType(Path path) {
-        String fileName = path.toString().toLowerCase();
-        if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
-            return "text/html";
-        } else if (fileName.endsWith(".css")) {
-            return "text/css";
-        } else if (fileName.endsWith(".js")) {
-            return "text/javascript";
-        } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
-            return "image/jpeg";
-        } else if (fileName.endsWith(".png")) {
-            return "image/png";
-        } else if (fileName.endsWith(".gif")) {
-            return "image/gif";
-        } else if (fileName.endsWith(".txt")) {
-            return "text/plain";
-        } else if (fileName.endsWith(".pdf")) {
-            return "application/pdf";
-        } else {
-            // Try to probe content type first
+        } finally {
             try {
-                String probed = Files.probeContentType(path);
-                if (probed != null) {
-                    return probed;
-                }
+                socket.close();
             } catch (IOException e) {
-                log("Error probing content type: " + e.getMessage());
+                log("Error closing socket: " + e.getMessage());
             }
-            // Default to text/plain for unknown types instead of application/octet-stream
-            return "text/plain";
         }
-    }
-
-
-    private void sendError(OutputStream outputStream, int statusCode, String message) throws IOException {
-        String response = "HTTP/1.1 " + statusCode + " " + message + "\r\n" +
-                         "Content-Type: text/plain\r\n" +
-                         "Content-Length: " + message.length() + "\r\n" +
-                         "\r\n" +
-                         message;
-        outputStream.write(response.getBytes());
-        outputStream.flush();
     }
 } 

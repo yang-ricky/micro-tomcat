@@ -4,6 +4,7 @@ public class ServerConfig {
     private final int port;
     private final boolean nonBlocking;
     private final int threadPoolSize;
+    
     private final String webRoot;
     
     public ServerConfig(int port, boolean nonBlocking, int threadPoolSize, String webRoot) {
@@ -23,6 +24,10 @@ public class ServerConfig {
     
     public String getWebRoot() {
         return webRoot;
+    }
+
+    public int getThreadPoolSize() {
+        return threadPoolSize;
     }
     
     // getters...
