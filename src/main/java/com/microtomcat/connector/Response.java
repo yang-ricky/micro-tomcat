@@ -3,12 +3,11 @@ package com.microtomcat.connector;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.File;
 
 public class Response {
-    private OutputStream output;
-    private Request request;
+    private final OutputStream output;
+    private final Request request;
     private static final String WEB_ROOT = "webroot";
 
     public Response(OutputStream output, Request request) {
@@ -16,37 +15,46 @@ public class Response {
         this.request = request;
     }
 
-    public void sendStaticResource() throws IOException {
-        Path filePath = Paths.get(WEB_ROOT, request.getUri());
-        if (Files.exists(filePath)) {
-            sendSuccessResponse(filePath);
-        } else {
-            sendNotFoundResponse();
-        }
-    }
-
-    private void sendSuccessResponse(Path filePath) throws IOException {
-        byte[] fileContent = Files.readAllBytes(filePath);
-        String contentType = getContentType(filePath.toString());
-        
+    public void sendServletResponse(String content) throws IOException {
         output.write("HTTP/1.1 200 OK\r\n".getBytes());
-        output.write(("Content-Type: " + contentType + "\r\n").getBytes());
-        output.write(("Content-Length: " + fileContent.length + "\r\n").getBytes());
+        output.write("Content-Type: text/html\r\n".getBytes());
+        output.write(("Content-Length: " + content.length() + "\r\n").getBytes());
         output.write("\r\n".getBytes());
-        output.write(fileContent);
+        output.write(content.getBytes());
         output.flush();
     }
 
-    private void sendNotFoundResponse() throws IOException {
-        String errorMessage = "404 File Not Found\r\n";
-        System.out.println("404 Not Found: " + request.getUri());
-        
-        output.write("HTTP/1.1 404 Not Found\r\n".getBytes());
+    public void sendError(int statusCode, String message) throws IOException {
+        output.write(("HTTP/1.1 " + statusCode + " " + message + "\r\n").getBytes());
         output.write("Content-Type: text/plain\r\n".getBytes());
-        output.write(("Content-Length: " + errorMessage.length() + "\r\n").getBytes());
+        output.write(("Content-Length: " + message.length() + "\r\n").getBytes());
         output.write("\r\n".getBytes());
-        output.write(errorMessage.getBytes());
+        output.write(message.getBytes());
         output.flush();
+    }
+
+    public void sendStaticResource() throws IOException {
+        String uri = request.getUri();
+        File file = new File(WEB_ROOT, uri);
+        
+        if (file.exists()) {
+            // Read the file content
+            byte[] fileContent = Files.readAllBytes(file.toPath());
+            
+            // Send headers
+            output.write("HTTP/1.1 200 OK\r\n".getBytes());
+            output.write(("Content-Type: " + getContentType(uri) + "\r\n").getBytes());
+            output.write(("Content-Length: " + fileContent.length + "\r\n").getBytes());
+            output.write("\r\n".getBytes());
+            
+            // Send file content
+            output.write(fileContent);
+            output.flush();
+        } else {
+            // File not found - send 404
+            String errorMessage = "404 File Not Found: " + uri;
+            sendError(404, errorMessage);
+        }
     }
 
     private String getContentType(String uri) {
