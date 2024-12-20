@@ -12,19 +12,19 @@
 - [ ] 构建最小化的 HTTP Server，支持静态资源的请求与响应
 
 #### 任务1：搭建项目结构与环境  
-- [ ] 创建 Maven 项目，搭建基础目录结构：`src/main/java` 和 `webroot`  
-- [ ] 定义核心类：`HttpServer`（监听请求）、`Request`（解析请求）、`Response`（生成响应）  
+- [x] 创建 Maven 项目，搭建基础目录结构：`src/main/java` 和 `webroot`  
+- [x] 定义核心类：`HttpServer`（监听请求）、`Request`（解析请求）、`Response`（生成响应）  
 **产出要求**：  
-- [ ] 项目目录清晰，`HttpServer` 能启动并监听 8080 端口  
+- [x] 项目目录清晰，`HttpServer` 能启动并监听 8080 端口  
 
 #### 任务2：实现简单的 HTTP Server  
 **场景**：支持返回静态文件  
-- [ ] 在 `HttpServer` 中创建 `ServerSocket`，监听端口并接受请求  
-- [ ] 解析客户端请求，提取 URI 并读取 `webroot` 目录下对应文件  
-- [ ] 返回静态文件内容，同时设置 HTTP 状态码、内容长度、Content-Type 等响应头  
+- [x] 在 `HttpServer` 中创建 `ServerSocket`，监听端口并接受请求  
+- [x] 解析客户端请求，提取 URI 并读取 `webroot` 目录下对应文件  
+- [x] 返回静态文件内容，同时设置 HTTP 状态码、内容长度、Content-Type 等响应头  
 **产出要求**：  
-- [ ] 浏览器访问 `http://localhost:8080/hello.txt`，能正确返回文件内容  
-- [ ] 控制台打印请求日志（URI、客户端 IP 等）  
+- [x] 浏览器访问 `http://localhost:8080/hello.txt`，能正确返回文件内容  
+- [x] 控制台打印请求日志（URI、客户端 IP 等）  
 
 #### 任务3：解析 HTTP 请求  
 **场景**：提取 HTTP 方法和 URI  
