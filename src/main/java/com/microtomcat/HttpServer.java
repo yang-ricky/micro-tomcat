@@ -8,14 +8,18 @@ import java.time.format.DateTimeFormatter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class HttpServer {
     private static final int DEFAULT_PORT = 8080;
     private final int port;
     private static final String WEB_ROOT = "webroot";
+    private final ExecutorService executorService;
 
     public HttpServer(int port) {
         this.port = port;
+        this.executorService = Executors.newFixedThreadPool(10);
     }
 
     private void log(String message) {
@@ -30,11 +34,25 @@ public class HttpServer {
             while (true) {
                 Socket socket = serverSocket.accept();
                 log("New connection accepted from: " + socket.getInetAddress());
-                handleRequest(socket);
+                executorService.submit(() -> {
+                    try {
+                        handleRequest(socket);
+                    } catch (IOException e) {
+                        log("Error handling request: " + e.getMessage());
+                    } finally {
+                        try {
+                            socket.close();
+                        } catch (IOException e) {
+                            log("Error closing socket: " + e.getMessage());
+                        }
+                    }
+                });
             }
         } catch (IOException e) {
             log("Server error: " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            executorService.shutdown();
         }
     }
 
