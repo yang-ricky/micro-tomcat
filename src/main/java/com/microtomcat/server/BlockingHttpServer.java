@@ -72,25 +72,21 @@ public class BlockingHttpServer extends AbstractHttpServer {
         }
     }
 
+
     private void serveFile(String requestPath, OutputStream outputStream) throws IOException {
-        // Convert URL path to file system path
         String filePath = config.getWebRoot() + requestPath;
         Path path = Paths.get(filePath);
-
+        
         if (!Files.exists(path)) {
             sendError(outputStream, 404, "Not Found");
             return;
         }
 
-        // Send successful response with file contents
         byte[] fileContent = Files.readAllBytes(path);
-        String contentType = Files.probeContentType(path);
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
-
+        String contentType = getContentType(path);
+        
         String response = "HTTP/1.1 200 OK\r\n" +
-                         "Content-Type: " + contentType + "\r\n" +
+                         "Content-Type: " + contentType + "; charset=UTF-8\r\n" +
                          "Content-Length: " + fileContent.length + "\r\n" +
                          "\r\n";
         
@@ -98,6 +94,40 @@ public class BlockingHttpServer extends AbstractHttpServer {
         outputStream.write(fileContent);
         outputStream.flush();
     }
+
+    private String getContentType(Path path) {
+        String fileName = path.toString().toLowerCase();
+        if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+            return "text/html";
+        } else if (fileName.endsWith(".css")) {
+            return "text/css";
+        } else if (fileName.endsWith(".js")) {
+            return "text/javascript";
+        } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+            return "image/jpeg";
+        } else if (fileName.endsWith(".png")) {
+            return "image/png";
+        } else if (fileName.endsWith(".gif")) {
+            return "image/gif";
+        } else if (fileName.endsWith(".txt")) {
+            return "text/plain";
+        } else if (fileName.endsWith(".pdf")) {
+            return "application/pdf";
+        } else {
+            // Try to probe content type first
+            try {
+                String probed = Files.probeContentType(path);
+                if (probed != null) {
+                    return probed;
+                }
+            } catch (IOException e) {
+                log("Error probing content type: " + e.getMessage());
+            }
+            // Default to text/plain for unknown types instead of application/octet-stream
+            return "text/plain";
+        }
+    }
+
 
     private void sendError(OutputStream outputStream, int statusCode, String message) throws IOException {
         String response = "HTTP/1.1 " + statusCode + " " + message + "\r\n" +

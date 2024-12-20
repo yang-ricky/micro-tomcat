@@ -129,7 +129,7 @@ public class HttpServer {
             // 创建服务器配置
             ServerConfig config = new ServerConfig(
                 DEFAULT_PORT,    // 端口
-                true,          // 使用阻塞式 IO
+                false,          // 使用阻塞式 IO
                 10,            // 线程池大小
                 WEB_ROOT       // Web根目录
             );
