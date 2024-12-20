@@ -39,6 +39,8 @@ public class Response {
 
     private void sendNotFoundResponse() throws IOException {
         String errorMessage = "404 File Not Found\r\n";
+        System.out.println("404 Not Found: " + request.getUri());
+        
         output.write("HTTP/1.1 404 Not Found\r\n".getBytes());
         output.write("Content-Type: text/plain\r\n".getBytes());
         output.write(("Content-Length: " + errorMessage.length() + "\r\n").getBytes());
