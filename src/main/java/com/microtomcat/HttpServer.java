@@ -11,6 +11,10 @@ import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.microtomcat.server.ServerConfig;
+import com.microtomcat.server.AbstractHttpServer;
+import com.microtomcat.server.HttpServerFactory;
+
 public class HttpServer {
     private static final int DEFAULT_PORT = 8080;
     private final int port;
@@ -121,7 +125,23 @@ public class HttpServer {
     }
 
     public static void main(String[] args) {
-        HttpServer server = new HttpServer(DEFAULT_PORT);
-        server.start();
+        try {
+            // 创建服务器配置
+            ServerConfig config = new ServerConfig(
+                DEFAULT_PORT,    // 端口
+                true,          // 使用阻塞式 IO
+                10,            // 线程池大小
+                WEB_ROOT       // Web根目录
+            );
+            
+            // 通过工厂创建服务器实例
+            AbstractHttpServer server = HttpServerFactory.createServer(config);
+            
+            // 启动服务器
+            server.start();
+        } catch (IOException e) {
+            System.err.println("Server startup failed: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
