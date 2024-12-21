@@ -159,60 +159,68 @@
 
 #### 任务15：Pipeline-Valve 处理链实现
 **场景**：灵活的请求处理链
-- [ ] 定义 Pipeline 和 Valve 接口
-- [ ] 实现基础 Valve（如认证、日志记录）
-- [ ] 支持动态添加和移除 Valve
+- [ ] 设计并实现 Pipeline 接口，包含 `addValve()`, `getValves()`, `invoke()` 等核心方法
+- [ ] 设计并实现 Valve 接口，定义 `invoke(Request, Response, ValveContext)` 方法
+- [ ] 实现基础阀门：AccessLogValve（访问日志）、AuthenticatorValve（认证）、StandardValve（标准处理）
+- [ ] 实现 StandardPipeline 作为默认实现，支持阀门的动态添加、移除和排序
 **产出要求**：
 - [ ] 请求能够按照配置的 Valve 链依次处理
 - [ ] 提供示例 Valve 实现（如请求计数、访问控制）
 
 #### 任务16：生命周期管理
 **场景**：标准化组件生命周期
-- [ ] 实现 Lifecycle 接口（init, start, stop, destroy）
-- [ ] 添加生命周期事件和监听器支持
-- [ ] 为主要组件添加生命周期管理
+- [ ] 实现 Lifecycle 接口，定义 BEFORE_INIT、AFTER_INIT、BEFORE_START 等标准事件
+- [ ] 设计 LifecycleSupport 类处理事件分发，支持同步和异步事件通知
+- [ ] 实现生命周期状态机，确保状态转换的正确性（如 NEW -> INITIALIZING -> INITIALIZED -> STARTING）
+- [ ] 为 Server、Service、Connector、Container 等核心组件添加生命周期支持
 **产出要求**：
 - [ ] 所有核心组件支持标准生命周期管理
 - [ ] 生命周期事件正确触发和处理
 
 #### 任务17：容器层次结构
 **场景**：多层次容器支持
-- [ ] 实现 Engine 容器（顶层容器）
-- [ ] 实现 Host 容器（虚拟主机）
-- [ ] 完善 Context 容器
-- [ ] 实现 Wrapper 容器（Servlet 封装）
+- [ ] 实现 Engine 容器：处理服务器级别的路由和配置，管理多个虚拟主机
+- [ ] 实现 Host 容器：支持域名映射，管理多个 Context，配置虚拟主机级别的资源
+- [ ] 实现 Context 容器：管理单个 Web 应用，包括类加载、资源访问、Session 管理
+- [ ] 实现 Wrapper 容器：封装单个 Servlet 实例，处理初始化参数、过滤器链和监听器
+- [ ] 实现容器事件系统，支持容器间的通信和状态同步
 **产出要求**：
-- [ ] 支持多虚拟主机配置
+- [ ] 支持多虚拟主机配置和域名路由
 - [ ] 请求能够正确路由到对应容器层级
 
 #### 任务18：类加载体系
 **场景**：专业的类加载器层次
-- [ ] 实现 Common ClassLoader
-- [ ] 实现 Catalina ClassLoader
-- [ ] 实现 Shared ClassLoader
-- [ ] 实现 WebApp ClassLoader
+- [ ] 实现 Common ClassLoader：加载共享的基础类库，作为其他类加载器的父加载器
+- [ ] 实现 Catalina ClassLoader：加载服务器核心类，确保核心类的隔离
+- [ ] 实现 Shared ClassLoader：加载多个应用共享的类库
+- [ ] 实现 WebApp ClassLoader：为每个应用提供独立的类加载环境，支持热加载
+- [ ] 实现资源定位和加载策略，支持 JAR 文件和目录的类加载
 **产出要求**：
-- [ ] 类加载遵循双亲委派模型
-- [ ] 不同应用间的类隔离正确
+- [ ] 类加载遵循双亲委派模型，确保安全性
+- [ ] 支持应用级别的类隔离和热加载
 
 #### 任务19：JMX 管理支持
 **场景**：运行时监控和管理
-- [ ] 定义核心组件的 MBean 接口
-- [ ] 实现 JMX 注册机制
-- [ ] 提供基础监控指标
+- [ ] 设计并实现核心组件的 MBean 接口：ServerMBean、ServiceMBean、ConnectorMBean 等
+- [ ] 实现 MBeanRegistry 管理 MBean 的注册和注销
+- [ ] 添加关键性能指标：请求处理时间、活动线程数、内存使用等
+- [ ] 实现配置属性的动态修改和持久化
+- [ ] 提供 JMX 操作接口，支持运行时重载应用、修改日志级别等
 **产出要求**：
-- [ ] 通过 JConsole 可以查看服务器状态
-- [ ] 支持运行时修改配置参数
+- [ ] 通过 JConsole 可以查看完整的服务器状态
+- [ ] 支持运行时修改配置参数并即时生效
 
 #### 任务20：安全框架
 **场景**：用户认证和授权
-- [ ] 实现 Realm 接口和基础实现
-- [ ] 添加用户认证机制
-- [ ] 实现角色和权限控制
-- [ ] 支持安全约束配置
+- [ ] 实现 Realm 接口和主要方法：authenticate()、hasRole()、getPrincipal() 等
+- [ ] 实现基于内存、文件和数据库的 Realm 实现
+- [ ] 设计并实现安全约束配置，支持 URL 模式和 HTTP 方法的访问控制
+- [ ] 实现基于角色的访问控制（RBAC），支持角色继承
+- [ ] 添加安全拦截器，处理认证和授权逻辑
+- [ ] 实现安全会话管理，支持会话固定保护和超时控制
 **产出要求**：
-- [ ] 支持基于配置的访问控制
-- [ ] 提供示例 Realm 实现（如文件基础的用户存储）
+- [ ] 支持声明式和编程式的访问控制
+- [ ] 提供完整的身份认证和授权示例
 
 ---
 
