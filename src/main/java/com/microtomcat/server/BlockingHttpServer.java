@@ -4,6 +4,7 @@ import com.microtomcat.connector.Connector;
 import com.microtomcat.processor.Processor;
 import com.microtomcat.processor.ProcessorPool;
 import com.microtomcat.servlet.ServletLoader;
+import com.microtomcat.session.SessionManager;
 
 import java.io.*;
 import java.net.Socket;
@@ -20,7 +21,13 @@ public class BlockingHttpServer extends AbstractHttpServer {
         super(config);
         this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
         try {
-            this.processorPool = new ProcessorPool(100, config.getWebRoot(), new ServletLoader(config.getWebRoot(), "target/classes"));
+            SessionManager sessionManager = new SessionManager();
+            this.processorPool = new ProcessorPool(
+                100,  // maxProcessors
+                config.getWebRoot(),
+                new ServletLoader(config.getWebRoot(), "target/classes"),
+                sessionManager  // 添加 sessionManager 参数
+            );
             this.connector = new Connector(config.getPort(), processorPool);
         } catch (IOException e) {
             throw new RuntimeException("Failed to initialize server", e);

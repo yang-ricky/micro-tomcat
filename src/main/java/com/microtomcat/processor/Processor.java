@@ -5,7 +5,7 @@ import com.microtomcat.connector.Response;
 import com.microtomcat.servlet.Servlet;
 import com.microtomcat.servlet.ServletException;
 import com.microtomcat.servlet.ServletLoader;
-
+import com.microtomcat.session.SessionManager;
 import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
@@ -15,17 +15,18 @@ public class Processor {
     private final ServletLoader servletLoader;
     private final String webRoot;
     private boolean available = true;
-
-    public Processor(String webRoot, ServletLoader servletLoader) {
+    private final SessionManager sessionManager;
+    public Processor(String webRoot, ServletLoader servletLoader, SessionManager sessionManager) {
         this.webRoot = webRoot;
         this.servletLoader = servletLoader;
+        this.sessionManager = sessionManager;
     }
 
     public void process(Socket socket) {
         try (InputStream input = socket.getInputStream();
              OutputStream output = socket.getOutputStream()) {
             
-            Request request = new Request(input);
+            Request request = new Request(input, sessionManager);
             Response response = new Response(output, request);
             
             request.parse();

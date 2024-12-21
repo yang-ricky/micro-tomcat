@@ -69,4 +69,13 @@ public class Response {
         }
         return "application/octet-stream";
     }
+
+    public void addCookie(String name, String value) {
+        String cookie = String.format("Set-Cookie: %s=%s; Path=/\r\n", name, value);
+        try {
+            output.write(cookie.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

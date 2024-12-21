@@ -11,7 +11,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
+import com.microtomcat.session.SessionManager;
 public class ProcessorPool {
     private final BlockingQueue<Processor> pool;
     private final List<Processor> allProcessors;
@@ -25,7 +25,7 @@ public class ProcessorPool {
     private final AtomicLong totalProcessingTime = new AtomicLong(0);
     private final AtomicLong requestCount = new AtomicLong(0);
 
-    public ProcessorPool(int maxProcessors, String webRoot, ServletLoader servletLoader) {
+    public ProcessorPool(int maxProcessors, String webRoot, ServletLoader servletLoader, SessionManager sessionManager) {
         this.maxProcessors = maxProcessors;
         this.webRoot = webRoot;
         this.servletLoader = servletLoader;
@@ -35,7 +35,7 @@ public class ProcessorPool {
         // 预创建一些处理器
         int initialProcessors = Math.min(maxProcessors / 2, 10);
         for (int i = 0; i < initialProcessors; i++) {
-            createProcessor();
+            createProcessor(sessionManager);
         }
     }
 
@@ -66,8 +66,8 @@ public class ProcessorPool {
         }
     }
 
-    private Processor createProcessor() {
-        Processor processor = new Processor(webRoot, servletLoader);
+    private Processor createProcessor(SessionManager sessionManager) {
+        Processor processor = new Processor(webRoot, servletLoader, sessionManager);
         pool.offer(processor);
         allProcessors.add(processor);
         return processor;
