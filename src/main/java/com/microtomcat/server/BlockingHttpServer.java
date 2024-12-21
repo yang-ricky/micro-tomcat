@@ -25,7 +25,11 @@ public class BlockingHttpServer extends AbstractHttpServer {
         this.contextManager = new ContextManager(config.getWebRoot());
         
         // 添加根上下文，处理不带应用前缀的请求
-        contextManager.createContext("");  // 根上下文
+        contextManager.createContext("", config.getWebRoot());  // 根上下文
+        
+        // 添加应用上下文
+        contextManager.createContext("/app1", config.getWebRoot() + "/app1");
+        contextManager.createContext("/app2", config.getWebRoot() + "/app2");
         
         try {
             this.processorPool = new ProcessorPool(
