@@ -31,11 +31,12 @@ public class BlockingHttpServer extends AbstractHttpServer {
     @Override
     public void start() throws IOException {
         serverSocket = new ServerSocket(config.getPort());
-        log("Server started on port " + config.getPort());
+        log("Blocking server started on port: " + config.getPort());
 
         while (running) {
             try {
                 Socket socket = serverSocket.accept();
+                log("New connection accepted from: " + socket.getInetAddress());
                 executorService.execute(() -> handleRequest(socket));
             } catch (IOException e) {
                 if (running) {
@@ -50,9 +51,13 @@ public class BlockingHttpServer extends AbstractHttpServer {
         try {
             processor = processorPool.getProcessor(5000); // 5秒超时
             if (processor != null) {
+                log(String.format("Acquired processor (active/total: %d/%d) for request from: %s",
+                    processorPool.getActiveCount(),
+                    processorPool.getTotalCount(),
+                    socket.getInetAddress()));
                 processor.process(socket);
             } else {
-                // 如果无法获取处理器，返回服务器忙的响应
+                log("No processor available, sending 503 response to: " + socket.getInetAddress());
                 try (OutputStream output = socket.getOutputStream()) {
                     String response = "HTTP/1.1 503 Service Unavailable\r\n" +
                             "Content-Type: text/plain\r\n" +
@@ -63,17 +68,18 @@ public class BlockingHttpServer extends AbstractHttpServer {
                 }
             }
         } catch (InterruptedException e) {
-            log("Processor acquisition interrupted: " + e.getMessage());
+            log("Processor acquisition interrupted for " + socket.getInetAddress() + ": " + e.getMessage());
         } catch (IOException e) {
-            log("Error processing request: " + e.getMessage());
+            log("Error processing request from " + socket.getInetAddress() + ": " + e.getMessage());
         } finally {
             if (processor != null) {
                 processorPool.releaseProcessor(processor);
+                log("Released processor back to pool");
             }
             try {
                 socket.close();
             } catch (IOException e) {
-                log("Error closing socket: " + e.getMessage());
+                log("Error closing socket for " + socket.getInetAddress() + ": " + e.getMessage());
             }
         }
     }
