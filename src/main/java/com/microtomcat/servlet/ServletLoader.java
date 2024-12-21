@@ -11,7 +11,8 @@ public class ServletLoader {
     private final String webRoot;
     private final URLClassLoader classLoader;
     private final Map<String, Servlet> servletCache = new ConcurrentHashMap<>();
-
+    private static final String DEFAULT_PACKAGE = "com.microtomcat.example.";
+    
     public ServletLoader(String webRoot, String classesDirPath) throws IOException {
         this.webRoot = webRoot;
         File webRootDir = new File(webRoot);
@@ -32,12 +33,12 @@ public class ServletLoader {
                 return servletCache.get(servletPath);
             }
 
-            String className = "com.microtomcat.example." + 
-                servletPath.substring(servletPath.lastIndexOf("/") + 1);
-            Class<?> servletClass = classLoader.loadClass(className);
+            String servletName = servletPath.substring(servletPath.lastIndexOf("/") + 1);
+            
+            Class<?> servletClass = tryLoadServletClass(DEFAULT_PACKAGE + servletName, servletName);
             
             if (!Servlet.class.isAssignableFrom(servletClass)) {
-                throw new ServletException("Class " + className + " is not a Servlet");
+                throw new ServletException("Class " + servletClass.getName() + " is not a Servlet");
             }
 
             Servlet servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
@@ -48,6 +49,20 @@ public class ServletLoader {
         } catch (Exception e) {
             throw new ServletException("Error loading servlet: " + servletPath, e);
         }
+    }
+
+    private Class<?> tryLoadServletClass(String... classNames) throws ClassNotFoundException {
+        ClassNotFoundException lastException = null;
+        
+        for (String className : classNames) {
+            try {
+                return classLoader.loadClass(className);
+            } catch (ClassNotFoundException e) {
+                lastException = e;
+            }
+        }
+        
+        throw lastException;
     }
 
     public void destroy() {
