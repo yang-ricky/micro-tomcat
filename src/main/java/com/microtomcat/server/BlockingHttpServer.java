@@ -29,6 +29,8 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     @Override
     public void start() throws IOException {
+        log("Blocking server started on port: " + config.getPort());
+        
         // 启动连接处理线程
         for (int i = 0; i < config.getThreadPoolSize(); i++) {
             executorService.submit(new ConnectionHandler());
