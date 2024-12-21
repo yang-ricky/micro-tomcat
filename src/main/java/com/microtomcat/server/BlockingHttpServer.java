@@ -1,9 +1,7 @@
 package com.microtomcat.server;
 
-import com.microtomcat.connector.Request;
-import com.microtomcat.connector.Response;
-import com.microtomcat.servlet.Servlet;
-import com.microtomcat.servlet.ServletException;
+import com.microtomcat.processor.Processor;
+import com.microtomcat.processor.ProcessorPool;
 import com.microtomcat.servlet.ServletLoader;
 
 import java.io.*;
@@ -15,82 +13,81 @@ import java.util.concurrent.Executors;
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
     private final ServletLoader servletLoader;
+    private final ProcessorPool processorPool;
+    private ServerSocket serverSocket;
+    private volatile boolean running = true;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
         this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
         try {
-            // 假设 webRoot 是 "webroot" 目录
             this.servletLoader = new ServletLoader(config.getWebRoot(), "target/classes");
+            this.processorPool = new ProcessorPool(100, config.getWebRoot(), servletLoader);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to initialize ServletLoader", e);
+            throw new RuntimeException("Failed to initialize server", e);
         }
     }
 
     @Override
     public void start() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(config.getPort())) {
-            log("Blocking server started on port: " + config.getPort());
-            
-            while (!Thread.currentThread().isInterrupted()) {
+        serverSocket = new ServerSocket(config.getPort());
+        log("Server started on port " + config.getPort());
+
+        while (running) {
+            try {
                 Socket socket = serverSocket.accept();
-                log("New connection accepted from: " + socket.getInetAddress());
-                executorService.submit(() -> handleRequest(socket));
+                executorService.execute(() -> handleRequest(socket));
+            } catch (IOException e) {
+                if (running) {
+                    log("Error accepting connection: " + e.getMessage());
+                }
             }
-        } finally {
-            stop();
         }
     }
 
-    @Override
-    protected void stop() {
-        servletLoader.destroy();
-        executorService.shutdown();
-    }
-    
-    protected void handleRequest(Socket socket) {
-        try (InputStream input = socket.getInputStream();
-             OutputStream output = socket.getOutputStream()) {
-            
-            Request request = new Request(input);
-            request.parse();
-            Response response = new Response(output, request);
-            
-            String uri = request.getUri();
-            log(String.format("Received %s request for URI: %s", 
-                request.getMethod(), uri));
-            
-            if (uri.startsWith("/servlet/")) {
-                try {
-                    log("Loading servlet for URI: " + uri);
-                    Servlet servlet = servletLoader.loadServlet(uri);
-                    log("Servlet loaded successfully, calling service method");
-                    try {
-                        servlet.service(request, response);
-                        log("Servlet service completed");
-                    } catch (Exception e) {
-                        log("Error in servlet service: " + e.getMessage());
-                        e.printStackTrace();
-                        response.sendError(500, "Servlet Error: " + e.getMessage());
-                    }
-                } catch (ServletException e) {
-                    log("Servlet loading error: " + e.getMessage());
-                    e.printStackTrace();
-                    response.sendError(500, "Servlet Error: " + e.getMessage());
-                }
+    private void handleRequest(Socket socket) {
+        Processor processor = null;
+        try {
+            processor = processorPool.getProcessor(5000); // 5秒超时
+            if (processor != null) {
+                processor.process(socket);
             } else {
-                response.sendStaticResource();
+                // 如果无法获取处理器，返回服务器忙的响应
+                try (OutputStream output = socket.getOutputStream()) {
+                    String response = "HTTP/1.1 503 Service Unavailable\r\n" +
+                            "Content-Type: text/plain\r\n" +
+                            "Content-Length: 35\r\n" +
+                            "\r\n" +
+                            "Server is too busy, please try later.";
+                    output.write(response.getBytes());
+                }
             }
-            
+        } catch (InterruptedException e) {
+            log("Processor acquisition interrupted: " + e.getMessage());
         } catch (IOException e) {
-            log("Error handling request: " + e.getMessage());
-            e.printStackTrace();
+            log("Error processing request: " + e.getMessage());
         } finally {
+            if (processor != null) {
+                processorPool.releaseProcessor(processor);
+            }
             try {
                 socket.close();
             } catch (IOException e) {
                 log("Error closing socket: " + e.getMessage());
             }
         }
+    }
+
+    @Override
+    protected void stop() {
+        running = false;
+        try {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            log("Error closing server socket: " + e.getMessage());
+        }
+        executorService.shutdown();
     }
 } 

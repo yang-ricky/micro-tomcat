@@ -52,12 +52,12 @@
 
 #### 任务5：引入 Servlet 支持  
 **场景**：处理动态资源  
-- [ ] 定义 `Servlet` 接口，包含 `service(Request, Response)` 方法  
-- [ ] 在请求解析中根据 URI 判断静态或动态资源请求，动态资源请求调用对应 Servlet 的 `service` 方法生成响应  
-- [ ] 使用 URLClassLoader 动态加载 Servlet 类  
+- [x] 定义 `Servlet` 接口，包含 `service(Request, Response)` 方法  
+- [x] 在请求解析中根据 URI 判断静态或动态资源请求，动态资源请求调用对应 Servlet 的 `service` 方法生成响应  
+- [x] 使用 URLClassLoader 动态加载 Servlet 类  
 **产出要求**：  
-- [ ] 浏览器访问 `http://localhost:8080/servlet/HelloServlet`，正确返回动态内容  
-- [ ] 在控制台记录 Servlet 加载和执行日志  
+- [x] 浏览器访问 `http://localhost:8080/servlet/HelloServlet`，正确返回动态内容  
+- [x] 在控制台记录 Servlet 加载和执行日志  
 
 #### 任务6：模块化改造  
 **场景**：拆分模块职责  
