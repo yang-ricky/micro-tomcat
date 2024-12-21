@@ -66,7 +66,7 @@ public class Connector implements Runnable {
         }
     }
     
-    public void stop() {
+    public void close() {
         running = false;
         try {
             serverSocket.close();

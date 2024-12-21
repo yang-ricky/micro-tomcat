@@ -1,28 +1,27 @@
 package com.microtomcat.server;
 
+import com.microtomcat.connector.Connector;
 import com.microtomcat.processor.Processor;
 import com.microtomcat.processor.ProcessorPool;
 import com.microtomcat.servlet.ServletLoader;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
-    private final ServletLoader servletLoader;
     private final ProcessorPool processorPool;
-    private ServerSocket serverSocket;
+    private final Connector connector;
     private volatile boolean running = true;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
         this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
         try {
-            this.servletLoader = new ServletLoader(config.getWebRoot(), "target/classes");
-            this.processorPool = new ProcessorPool(100, config.getWebRoot(), servletLoader);
+            this.processorPool = new ProcessorPool(100, config.getWebRoot(), new ServletLoader(config.getWebRoot(), "target/classes"));
+            this.connector = new Connector(config.getPort(), processorPool);
         } catch (IOException e) {
             throw new RuntimeException("Failed to initialize server", e);
         }
@@ -30,17 +29,22 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     @Override
     public void start() throws IOException {
-        serverSocket = new ServerSocket(config.getPort());
-        log("Blocking server started on port: " + config.getPort());
+        // 启动连接处理线程
+        for (int i = 0; i < config.getThreadPoolSize(); i++) {
+            executorService.submit(new ConnectionHandler());
+        }
+        
+        // 启动连接接收线程
+        connector.run();
+    }
 
-        while (running) {
-            try {
-                Socket socket = serverSocket.accept();
-                log("New connection accepted from: " + socket.getInetAddress());
-                executorService.execute(() -> handleRequest(socket));
-            } catch (IOException e) {
-                if (running) {
-                    log("Error accepting connection: " + e.getMessage());
+    private class ConnectionHandler implements Runnable {
+        @Override
+        public void run() {
+            while (running) {
+                Socket socket = connector.getSocket();
+                if (socket != null) {
+                    handleRequest(socket);
                 }
             }
         }
@@ -88,10 +92,10 @@ public class BlockingHttpServer extends AbstractHttpServer {
     protected void stop() {
         running = false;
         try {
-            if (serverSocket != null) {
-                serverSocket.close();
+            if (connector != null) {
+                connector.close();
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             log("Error closing server socket: " + e.getMessage());
         }
         executorService.shutdown();
