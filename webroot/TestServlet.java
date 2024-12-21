@@ -1,4 +1,4 @@
- 
+public class TestServlet extends com.microtomcat.servlet.HttpServlet {
     @Override
     protected void doGet(com.microtomcat.connector.Request request, 
                         com.microtomcat.connector.Response response) 
