@@ -9,6 +9,7 @@ import java.util.Map;
 
 import com.microtomcat.session.Session;
 import com.microtomcat.session.SessionManager;
+import com.microtomcat.context.Context;
 
 public class Request {
     private InputStream input;
@@ -19,6 +20,7 @@ public class Request {
     private final SessionManager sessionManager;
     private static final String SESSION_COOKIE_NAME = "JSESSIONID";
     private final Map<String, String> headers = new HashMap<>();
+    private Context context;
 
     public Request(InputStream input, SessionManager sessionManager) {
         this.input = input;
@@ -72,17 +74,16 @@ public class Request {
             return session;
         }
 
-        // 从 Cookie 中获取会话 ID
         String sessionId = getCookieValue(SESSION_COOKIE_NAME);
-        if (sessionId != null) {
-            session = sessionManager.getSession(sessionId);
+        if (sessionId != null && context != null) {
+            session = context.getSessionManager().getSession(sessionId);
             if (session != null) {
                 return session;
             }
         }
 
-        if (create) {
-            session = sessionManager.createSession();
+        if (create && context != null) {
+            session = context.getSessionManager().createSession();
             return session;
         }
 
@@ -110,5 +111,13 @@ public class Request {
 
     public String getHeader(String name) {
         return headers.get(name);
+    }
+
+    public void setContext(Context context) {
+        this.context = context;
+    }
+
+    public Context getContext() {
+        return context;
     }
 }

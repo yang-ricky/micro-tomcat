@@ -61,37 +61,37 @@
 
 #### 任务6：模块化改造  
 **场景**：拆分模块职责  
-- [ ] 将请求监听与处理分离：实现 `Connector` 负责监听请求，`Processor` 负责处理请求  
-- [ ] `Processor` 支持静态和动态资源分发  
+- [x] 将请求监听与处理分离：实现 `Connector` 负责监听请求，`Processor` 负责处理请求  
+- [x] `Processor` 支持静态和动态资源分发  
 **产出要求**：  
-- [ ] 项目模块划分清晰，`Connector` 和 `Processor` 各司其职  
-- [ ] 代码结构具有良好的可维护性  
+- [x] 项目模块划分清晰，`Connector` 和 `Processor` 各司其职  
+- [x] 代码结构具有良好的可维护性  
 
 #### 任务7：引入 Processor 池化  
 **场景**：提升并发处理性能  
-- [ ] 使用池化技术管理 Processor 对象，避免频繁创建和销毁  
-- [ ] 限制 Processor 池大小，确保在高并发场景下资源不被耗尽  
+- [x] 使用池化技术管理 Processor 对象，避免频繁创建和销毁  
+- [x] 限制 Processor 池大小，确保在高并发场景下资源不被耗尽  
 **产出要求**：  
-- [ ] 支持至少 100 并发请求，正确返回响应且无明显性能下降  
-- [ ] 输出性能测试结果（如每秒请求处理量）  
+- [x] 支持至少 100 并发请求，正确返回响应且无明显性能下降  
+- [x] 输出性能测试结果（如每秒请求处理量）  
 
 #### 任务8：优化线程管理  
 **场景**：提升线程利用率  
-- [ ] 为 Processor 引入线程池，实现多个线程同时处理不同请求  
-- [ ] 使用 `wait/notify` 机制实现 Processor 和 Connector 的同步  
+- [x] 为 Processor 引入线程池，实现多个线程同时处理不同请求  
+- [x] 使用 `wait/notify` 机制实现 Processor 和 Connector 的同步  
 **产出要求**：  
-- [ ] 多线程支持稳定，能够在高并发场景下无死锁和性能问题  
+- [x] 多线程支持稳定，能够在高并发场景下无死锁和性能问题  
 
 #### 任务9：实现 Session 管理  
 **场景**：支持用户会话管理  
-- [ ] 实现 `Session` 类，支持属性的存取  
-- [ ] 使用 Cookie 或 URL 重写实现 Session ID 的传递  
-- [ ] 实现 Session 超时机制和定期清理  
-- [ ] 在 Request 和 Response 中添加 Session 相关方法  
+- [x] 实现 `Session` 类，支持属性的存取  
+- [x] 使用 Cookie 或 URL 重写实现 Session ID 的传递  
+- [x] 实现 Session 超时机制和定期清理  
+- [x] 在 Request 和 Response 中添加 Session 相关方法  
 **产出要求**：  
-- [ ] 能够正确创建、获取和维护用户 Session  
-- [ ] Session 在超时后自动失效并被清理  
-- [ ] 提供示例 Servlet 演示 Session 的使用（如简单的登录状态维护）  
+- [x] 能够正确创建、获取和维护用户 Session  
+- [x] Session 在超时后自动失效并被清理  
+- [x] 提供示例 Servlet 演示 Session 的使用（如简单的登录状态维护）  
 
 ---
 
