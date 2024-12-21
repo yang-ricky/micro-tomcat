@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.io.File;
-
+import java.util.ArrayList;
+import java.util.List;
+import com.microtomcat.session.Session;
 public class Response {
     private final OutputStream output;
     private final Request request;
     private static final String WEB_ROOT = "webroot";
+    private final List<String> headers = new ArrayList<>();
 
     public Response(OutputStream output, Request request) {
         this.output = output;
@@ -16,11 +19,26 @@ public class Response {
     }
 
     public void sendServletResponse(String content) throws IOException {
-        output.write("HTTP/1.1 200 OK\r\n".getBytes());
-        output.write("Content-Type: text/html\r\n".getBytes());
-        output.write(("Content-Length: " + content.length() + "\r\n").getBytes());
-        output.write("\r\n".getBytes());
-        output.write(content.getBytes());
+        // 获取当前请求的 Session
+        Session session = request.getSession();
+        if (session != null) {
+            addCookie("JSESSIONID", session.getId());
+        }
+        
+        StringBuilder response = new StringBuilder();
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: text/html\r\n");
+        response.append("Content-Length: ").append(content.getBytes().length).append("\r\n");
+        
+        // 添加所有响应头
+        for (String header : headers) {
+            response.append(header).append("\r\n");
+        }
+        
+        response.append("\r\n");
+        response.append(content);
+        
+        output.write(response.toString().getBytes());
         output.flush();
     }
 
@@ -71,11 +89,6 @@ public class Response {
     }
 
     public void addCookie(String name, String value) {
-        String cookie = String.format("Set-Cookie: %s=%s; Path=/\r\n", name, value);
-        try {
-            output.write(cookie.getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        headers.add(String.format("Set-Cookie: %s=%s; Path=/", name, value));
     }
 }
