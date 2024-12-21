@@ -14,6 +14,7 @@ public class Connector implements Runnable {
     private final ProcessorPool processorPool;
     private volatile boolean running = true;
     private final BlockingQueue<Socket> connectionQueue;
+    private final Object lock = new Object();
     
     public Connector(int port, ProcessorPool processorPool) throws IOException {
         this.serverSocket = new ServerSocket(port);
@@ -36,32 +37,32 @@ public class Connector implements Runnable {
     }
 
     public void processSocket(Socket socket) {
-        synchronized(connectionQueue) {
+        synchronized(lock) {
             while (connectionQueue.remainingCapacity() == 0) {
                 try {
-                    connectionQueue.wait();
+                    lock.wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
                 }
             }
             connectionQueue.offer(socket);
-            connectionQueue.notifyAll();
+            lock.notifyAll();
         }
     }
     
     public Socket getSocket() {
-        synchronized(connectionQueue) {
+        synchronized(lock) {
             while (connectionQueue.isEmpty()) {
                 try {
-                    connectionQueue.wait();
+                    lock.wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return null;
                 }
             }
             Socket socket = connectionQueue.poll();
-            connectionQueue.notifyAll();
+            lock.notifyAll();
             return socket;
         }
     }
