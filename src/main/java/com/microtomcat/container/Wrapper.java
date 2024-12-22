@@ -7,10 +7,19 @@ import com.microtomcat.servlet.Servlet;
 import com.microtomcat.servlet.ServletException;
 import com.microtomcat.context.Context;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.servlet.Filter;
+import javax.servlet.ServletRequestListener;
 
 public class Wrapper extends ContainerBase {
     private Servlet servlet;
     private final String servletClass;
+    private Map<String, String> initParameters = new HashMap<>();
+    private List<Filter> filterChain = new ArrayList<>();
+    private List<ServletRequestListener> requestListeners = new ArrayList<>();
 
     public Wrapper(String name, String servletClass) {
         this.name = name;
@@ -74,5 +83,17 @@ public class Wrapper extends ContainerBase {
     @Override
     protected void destroyInternal() throws LifecycleException {
         log("Destroying Wrapper: " + name);
+    }
+
+    public void addInitParameter(String name, String value) {
+        initParameters.put(name, value);
+    }
+
+    public void addFilter(Filter filter) {
+        filterChain.add(filter);
+    }
+
+    public void addRequestListener(ServletRequestListener listener) {
+        requestListeners.add(listener);
     }
 } 
