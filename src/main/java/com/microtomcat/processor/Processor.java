@@ -19,28 +19,21 @@ import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import com.microtomcat.lifecycle.LifecycleException;
+import com.microtomcat.container.Engine;
+
 public class Processor extends LifecycleBase {
     private final String webRoot;
-    private final ServletLoader servletLoader;
-    private final SessionManager sessionManager;
-    private final ContextManager contextManager;
-    private final StandardPipeline pipeline;
+    private final Engine engine;
+    private final Pipeline pipeline;
 
-    public Processor(String webRoot, ServletLoader servletLoader, 
-                    SessionManager sessionManager, ContextManager contextManager) {
+    public Processor(String webRoot, Engine engine) {
         this.webRoot = webRoot;
-        this.servletLoader = servletLoader;
-        this.sessionManager = sessionManager;
-        this.contextManager = contextManager;
+        this.engine = engine;
         
         this.pipeline = new StandardPipeline();
-        
-        // 添加基础阀门
         pipeline.addValve(new AccessLogValve());
         pipeline.addValve(new AuthenticatorValve());
-        
-        // 设置基础阀门处理请求
-        pipeline.setBasic(new StandardValve(webRoot, servletLoader));
+        pipeline.setBasic(new StandardValve(webRoot));
     }
 
     @Override
@@ -69,18 +62,16 @@ public class Processor extends LifecycleBase {
 
     public void process(Socket socket) {
         try {
-            Request request = new Request(socket.getInputStream(), sessionManager);
+            Request request = new Request(socket.getInputStream(), null);
             Response response = new Response(socket.getOutputStream(), request);
             
             request.parse();
-            Context context = contextManager.getContext(request.getUri());
-            request.setContext(context);
             
-            // 使用 pipeline 处理请求
-            pipeline.invoke(request, response);
+            // 直接使用Engine处理请求
+            engine.invoke(request, response);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            log("Error processing request: " + e.getMessage());
         }
     }
 } 

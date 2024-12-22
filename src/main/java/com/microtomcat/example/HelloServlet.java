@@ -8,9 +8,7 @@ import java.io.IOException;
 
 public class HelloServlet extends HttpServlet {
     @Override
-    protected void doGet(Request request, Response response) 
-            throws ServletException, IOException {
-        String content = "<html><body><h1>Hello from HelloServlet!</h1></body></html>";
-        response.sendServletResponse(content);
+    public void service(Request request, Response response) throws ServletException, IOException {
+        response.sendServletResponse("Hello from HelloServlet!");
     }
 } 

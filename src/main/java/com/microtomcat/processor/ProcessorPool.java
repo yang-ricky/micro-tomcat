@@ -16,13 +16,14 @@ import com.microtomcat.context.ContextManager;
 import java.io.IOException;
 import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.lifecycle.LifecycleException;
+import com.microtomcat.container.Engine;
 
 public class ProcessorPool extends LifecycleBase {
     private final BlockingQueue<Processor> pool;
     private final List<Processor> allProcessors;
     private final int maxProcessors;
     private final String webRoot;
-    private final ContextManager contextManager;
+    private final Engine engine;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
     private final Condition notFull = lock.newCondition();
@@ -30,17 +31,17 @@ public class ProcessorPool extends LifecycleBase {
     private final AtomicLong totalProcessingTime = new AtomicLong(0);
     private final AtomicLong requestCount = new AtomicLong(0);
 
-    public ProcessorPool(int maxProcessors, String webRoot, ContextManager contextManager) {
+    public ProcessorPool(int maxProcessors, String webRoot, Engine engine) {
         this.maxProcessors = maxProcessors;
         this.webRoot = webRoot;
-        this.contextManager = contextManager;
+        this.engine = engine;
         this.pool = new ArrayBlockingQueue<>(maxProcessors);
         this.allProcessors = new ArrayList<>();
         
-        // 预创建一些处理器
+        // 预创建处理器
         int initialProcessors = Math.min(maxProcessors / 2, 10);
         for (int i = 0; i < initialProcessors; i++) {
-            createProcessor(new SessionManager());
+            createProcessor();
         }
     }
 
@@ -109,15 +110,10 @@ public class ProcessorPool extends LifecycleBase {
         }
     }
 
-    private void createProcessor(SessionManager sessionManager) {
-        try {
-            ServletLoader servletLoader = new ServletLoader(webRoot, webRoot + "/WEB-INF/classes");
-            Processor processor = new Processor(webRoot, servletLoader, sessionManager, contextManager);
-            allProcessors.add(processor);
-            pool.offer(processor);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to create processor", e);
-        }
+    private void createProcessor() {
+        Processor processor = new Processor(webRoot, engine);
+        allProcessors.add(processor);
+        pool.offer(processor);
     }
 
     public int getActiveCount() {

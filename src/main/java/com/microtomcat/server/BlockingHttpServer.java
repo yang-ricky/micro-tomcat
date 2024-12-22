@@ -5,7 +5,10 @@ import com.microtomcat.processor.Processor;
 import com.microtomcat.processor.ProcessorPool;
 import com.microtomcat.servlet.ServletLoader;
 import com.microtomcat.session.SessionManager;
-import com.microtomcat.context.ContextManager;
+import com.microtomcat.context.Context;
+import com.microtomcat.container.Engine;
+import com.microtomcat.container.Host;
+import com.microtomcat.lifecycle.LifecycleException;
 
 import java.io.*;
 import java.net.Socket;
@@ -16,33 +19,39 @@ public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
     private final ProcessorPool processorPool;
     private final Connector connector;
+    private final Engine engine;
     private volatile boolean running = true;
-    private final ContextManager contextManager;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
         this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
-        this.contextManager = new ContextManager(config.getWebRoot());
         
-        // 添加根上下文，处理不带应用前缀的请求
-        contextManager.createContext("", config.getWebRoot());  // 根上下文
+        this.engine = new Engine("MicroTomcat", "localhost");
         
-        // 添加应用上下文
-        contextManager.createContext("/app1", config.getWebRoot() + "/app1");
-        contextManager.createContext("/app2", config.getWebRoot() + "/app2");
-
+        Host defaultHost = new Host("localhost");
+        engine.addChild(defaultHost);
+        
         try {
+            Context rootContext = new Context("", config.getWebRoot());
+            defaultHost.addChild(rootContext);
+            
+            Context app1Context = new Context("/app1", config.getWebRoot() + "/app1");
+            Context app2Context = new Context("/app2", config.getWebRoot() + "/app2");
+            defaultHost.addChild(app1Context);
+            defaultHost.addChild(app2Context);
+            
             this.processorPool = new ProcessorPool(
                 100,
                 config.getWebRoot(),
-                contextManager
+                engine
             );
+            
             this.connector = new Connector(config.getPort(), processorPool);
             
-            // 初始化所有组件
-            contextManager.init();
+            engine.init();
             processorPool.init();
             connector.init();
+            
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize server", e);
         }
@@ -51,19 +60,16 @@ public class BlockingHttpServer extends AbstractHttpServer {
     @Override
     public void start() throws IOException {
         try {
-            // 启动所有组件
-            contextManager.start();
+            engine.start();
             processorPool.start();
             connector.start();
             
-            log("Blocking server started on port: " + config.getPort());
-            
-            // 启动连接处理线程
             for (int i = 0; i < config.getThreadPoolSize(); i++) {
                 executorService.submit(new ConnectionHandler());
             }
             
-            // 等待服务器停止
+            log("Server started on port " + config.getPort());
+            
             synchronized (this) {
                 try {
                     this.wait();
@@ -71,7 +77,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
                     Thread.currentThread().interrupt();
                 }
             }
-        } catch (Exception e) {
+        } catch (LifecycleException e) {
             throw new IOException("Failed to start server", e);
         }
     }
@@ -128,12 +134,11 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     @Override
     protected void stop() {
+        running = false;
         try {
-            // 停止所有组件
             connector.stop();
             processorPool.stop();
-            contextManager.stop();
-            
+            engine.stop();
             executorService.shutdown();
         } catch (Exception e) {
             log("Error while stopping server: " + e.getMessage());

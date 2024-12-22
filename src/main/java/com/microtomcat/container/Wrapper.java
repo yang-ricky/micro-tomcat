@@ -5,23 +5,29 @@ import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.servlet.Servlet;
 import com.microtomcat.servlet.ServletException;
+import com.microtomcat.context.Context;
 import java.io.IOException;
 
 public class Wrapper extends ContainerBase {
     private Servlet servlet;
-    private String servletClass;
+    private final String servletClass;
 
     public Wrapper(String name, String servletClass) {
         this.name = name;
         this.servletClass = servletClass;
     }
 
-    public void setServlet(Servlet servlet) {
-        this.servlet = servlet;
-    }
-
-    public Servlet getServlet() {
-        return servlet;
+    @Override
+    protected void initInternal() throws LifecycleException {
+        log("Initializing Wrapper: " + name);
+        try {
+            Context context = (Context) getParent();
+            Class<?> servletClass = context.getServletLoader().loadClass(this.servletClass);
+            servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
+            servlet.init();
+        } catch (Exception e) {
+            throw new LifecycleException("Failed to initialize servlet: " + name, e);
+        }
     }
 
     @Override
@@ -30,8 +36,7 @@ public class Wrapper extends ContainerBase {
             if (servlet != null) {
                 servlet.service(request, response);
             } else {
-                log("No servlet instance available");
-                response.sendError(503, "Service Unavailable: No servlet instance available");
+                throw new ServletException("No servlet instance available");
             }
         } catch (ServletException | IOException e) {
             log("Error invoking servlet: " + e.getMessage());
@@ -41,11 +46,6 @@ public class Wrapper extends ContainerBase {
                 log("Failed to send error response: " + ioe.getMessage());
             }
         }
-    }
-
-    @Override
-    protected void initInternal() throws LifecycleException {
-        log("Initializing Wrapper: " + name);
     }
 
     @Override
