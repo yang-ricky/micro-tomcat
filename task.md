@@ -169,13 +169,13 @@
 
 #### 任务16：生命周期管理
 **场景**：标准化组件生命周期
-- [ ] 实现 Lifecycle 接口，定义 BEFORE_INIT、AFTER_INIT、BEFORE_START 等标准事件
-- [ ] 设计 LifecycleSupport 类处理事件分发，支持同步和异步事件通知
-- [ ] 实现生命周期状态机，确保状态转换的正确性（如 NEW -> INITIALIZING -> INITIALIZED -> STARTING）
-- [ ] 为 Server、Service、Connector、Container 等核心组件添加生命周期支持
+- [x] 实现 Lifecycle 接口，定义 BEFORE_INIT、AFTER_INIT、BEFORE_START 等标准事件
+- [x] 设计 LifecycleSupport 类处理事件分发，支持同步和异步事件通知
+- [x] 实现生命周期状态机，确保状态转换的正确性（如 NEW -> INITIALIZING -> INITIALIZED -> STARTING）
+- [x] 为 Server、Service、Connector、Container 等核心组件添加生命周期支持
 **产出要求**：
-- [ ] 所有核心组件支持标准生命周期管理
-- [ ] 生命周期事件正确触发和处理
+- [x] 所有核心组件支持标准生命周期管理
+- [x] 生命周期事件正确触发和处理
 
 #### 任务17：容器层次结构
 **场景**：多层次容器支持

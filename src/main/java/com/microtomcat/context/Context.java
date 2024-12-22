@@ -1,30 +1,28 @@
 package com.microtomcat.context;
 
-import com.microtomcat.lifecycle.LifecycleBase;
+import com.microtomcat.container.Container;
+import com.microtomcat.container.ContainerBase;
+import com.microtomcat.container.Wrapper;
+import com.microtomcat.connector.Request;
+import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.servlet.ServletLoader;
 import com.microtomcat.session.SessionManager;
 import java.io.File;
 import java.io.IOException;
 
-public class Context extends LifecycleBase {
-    private final String contextPath;
+public class Context extends ContainerBase {
     private final String docBase;
     private final ServletLoader servletLoader;
     private final SessionManager sessionManager;
 
-    public Context(String contextPath, String docBase) throws IOException {
-        this.contextPath = contextPath;
+    public Context(String name, String docBase) throws IOException {
+        this.name = name;
         this.docBase = docBase;
         this.sessionManager = new SessionManager();
         
-        // 为每个上下文创建独立的 ServletLoader
         String classesPath = docBase + "/WEB-INF/classes";
         this.servletLoader = new ServletLoader(docBase, classesPath);
-    }
-
-    public String getContextPath() {
-        return contextPath;
     }
 
     public String getDocBase() {
@@ -40,33 +38,96 @@ public class Context extends LifecycleBase {
     }
 
     @Override
+    public void invoke(Request request, Response response) {
+        request.setContext(this);
+        
+        String servletPath = getServletPath(request.getUri());
+        if (servletPath != null && servletPath.startsWith("/servlet/")) {
+            String servletName = servletPath.substring("/servlet/".length());
+            try {
+                Wrapper wrapper = (Wrapper) findChild(servletName);
+                if (wrapper == null) {
+                    // 动态创建Wrapper
+                    wrapper = new Wrapper(servletName, "com.microtomcat.example." + servletName);
+                    addChild(wrapper);
+                    wrapper.start();
+                }
+                wrapper.invoke(request, response);
+            } catch (Exception e) {
+                log("Error processing servlet request: " + e.getMessage());
+                try {
+                    response.sendError(500, "Internal Server Error: " + e.getMessage());
+                } catch (IOException ioe) {
+                    log("Failed to send error response: " + ioe.getMessage());
+                }
+            }
+        } else {
+            // 处理静态资源
+            try {
+                String relativePath = request.getUri();
+                // 如果URI以上下文路径开头，移除它
+                if (relativePath.startsWith(name) && !name.equals("/")) {
+                    relativePath = relativePath.substring(name.length());
+                }
+                // 如果路径是目录，默认查找 index.html
+                if (relativePath.endsWith("/")) {
+                    relativePath += "index.html";
+                }
+                
+                File file = new File(docBase, relativePath);
+                if (file.exists() && file.isFile()) {
+                    response.sendStaticResource(file);
+                } else {
+                    response.sendError(404, "File Not Found: " + relativePath);
+                }
+            } catch (IOException e) {
+                log("Error sending static resource: " + e.getMessage());
+                try {
+                    response.sendError(500, "Internal Server Error: " + e.getMessage());
+                } catch (IOException ioe) {
+                    log("Failed to send error response: " + ioe.getMessage());
+                }
+            }
+        }
+    }
+
+    private String getServletPath(String uri) {
+        if (uri == null) {
+            return null;
+        }
+        // 如果URI以上下文路径开头，移除它
+        if (uri.startsWith(name) && !name.equals("/")) {
+            return uri.substring(name.length());
+        }
+        return uri;
+    }
+
+    @Override
     protected void initInternal() throws LifecycleException {
-        log("Initializing context: " + contextPath);
-        // 初始化 ServletLoader
-        // 初始化 SessionManager
+        log("Initializing context: " + name);
     }
 
     @Override
     protected void startInternal() throws LifecycleException {
-        log("Starting context: " + contextPath);
-        // 启动 ServletLoader
-        // 启动 SessionManager
+        log("Starting context: " + name);
+        Container[] children = findChildren();
+        for (Container child : children) {
+            child.start();
+        }
     }
 
     @Override
     protected void stopInternal() throws LifecycleException {
-        log("Stopping context: " + contextPath);
-        // 停止 ServletLoader
-        // 停止 SessionManager
+        log("Stopping context: " + name);
+        Container[] children = findChildren();
+        for (Container child : children) {
+            child.stop();
+        }
     }
 
     @Override
     protected void destroyInternal() throws LifecycleException {
-        log("Destroying context: " + contextPath);
-        // 清理资源
-    }
-
-    private void log(String message) {
-        System.out.println("[Context] " + message);
+        log("Destroying context: " + name);
+        servletLoader.destroy();
     }
 } 

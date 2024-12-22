@@ -51,23 +51,40 @@ public class Response {
         output.flush();
     }
 
+    public void sendStaticResource(File file) throws IOException {
+        if (!file.exists() || !file.isFile()) {
+            sendError(404, "File Not Found: " + file.getPath());
+            return;
+        }
+
+        byte[] fileContent = Files.readAllBytes(file.toPath());
+        
+        // Send headers
+        StringBuilder response = new StringBuilder();
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: ").append(getContentType(file.getName())).append("\r\n");
+        response.append("Content-Length: ").append(fileContent.length).append("\r\n");
+        
+        // 添加所有响应头
+        for (String header : headers) {
+            response.append(header).append("\r\n");
+        }
+        
+        response.append("\r\n");
+        
+        // 发送响应头和文件内容
+        output.write(response.toString().getBytes());
+        output.write(fileContent);
+        output.flush();
+    }
+
+    @Deprecated
     public void sendStaticResource() throws IOException {
         String uri = request.getUri();
         File file = new File(WEB_ROOT, uri);
         
-        if (file.exists()) {
-            // Read the file content
-            byte[] fileContent = Files.readAllBytes(file.toPath());
-            
-            // Send headers
-            output.write("HTTP/1.1 200 OK\r\n".getBytes());
-            output.write(("Content-Type: " + getContentType(uri) + "\r\n").getBytes());
-            output.write(("Content-Length: " + fileContent.length + "\r\n").getBytes());
-            output.write("\r\n".getBytes());
-            
-            // Send file content
-            output.write(fileContent);
-            output.flush();
+        if (file.exists() && file.isFile()) {
+            sendStaticResource(file);
         } else {
             // File not found - send 404
             String errorMessage = "404 File Not Found: " + uri;
