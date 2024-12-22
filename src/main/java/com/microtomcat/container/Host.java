@@ -26,12 +26,15 @@ public class Host extends ContainerBase {
         String contextPath = getContextPath(request.getUri());
         Context context = (Context) findChild(contextPath);
         
+        if (context == null) {
+            context = (Context) findChild("");
+        }
+        
         if (context != null) {
             context.invoke(request, response);
         } else {
-            log("No matching context found for: " + contextPath);
             try {
-                response.sendError(404, "No matching context found for: " + contextPath);
+                response.sendError(404, "Context not found for: " + request.getUri());
             } catch (IOException e) {
                 log("Error sending 404 response: " + e.getMessage());
             }
@@ -39,16 +42,12 @@ public class Host extends ContainerBase {
     }
 
     private String getContextPath(String uri) {
-        String contextPath = "/";
-        if (uri != null && uri.length() > 0) {
-            int secondSlash = uri.indexOf('/', 1);
-            if (secondSlash != -1) {
-                contextPath = uri.substring(0, secondSlash);
-            } else {
-                contextPath = uri;
-            }
+        if (uri == null) return "";
+        int nextSlash = uri.indexOf('/', 1);
+        if (nextSlash != -1) {
+            return uri.substring(0, nextSlash);
         }
-        return contextPath;
+        return uri;
     }
 
     @Override

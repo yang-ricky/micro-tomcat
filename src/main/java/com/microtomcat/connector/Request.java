@@ -21,6 +21,7 @@ public class Request {
     private static final String SESSION_COOKIE_NAME = "JSESSIONID";
     private final Map<String, String> headers = new HashMap<>();
     private Context context;
+    private String serverName;
 
     public Request(InputStream input, SessionManager sessionManager) {
         this.input = input;
@@ -119,5 +120,19 @@ public class Request {
 
     public Context getContext() {
         return context;
+    }
+
+    public String getServerName() {
+        if (serverName == null) {
+            // 从Host头中获取
+            serverName = getHeader("Host");
+            if (serverName != null) {
+                int colonPos = serverName.indexOf(':');
+                if (colonPos != -1) {
+                    serverName = serverName.substring(0, colonPos);
+                }
+            }
+        }
+        return serverName;
     }
 }

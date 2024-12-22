@@ -4,13 +4,17 @@ import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.pipeline.Pipeline;
 import com.microtomcat.pipeline.StandardPipeline;
 import java.util.concurrent.ConcurrentHashMap;
-
+import com.microtomcat.container.event.ContainerEvent;
+import com.microtomcat.container.event.ContainerListener;
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class ContainerBase extends LifecycleBase implements Container {
     protected Container parent = null;
     protected final ConcurrentHashMap<String, Container> children = new ConcurrentHashMap<>();
     protected Pipeline pipeline = new StandardPipeline();
     protected String name = null;
+    private final List<ContainerListener> listeners = new ArrayList<>();
 
     @Override
     public Container getParent() { return parent; }
@@ -33,6 +37,7 @@ public abstract class ContainerBase extends LifecycleBase implements Container {
     public void addChild(Container child) {
         child.setParent(this);
         children.put(child.getName(), child);
+        fireContainerEvent(ContainerEvent.CHILD_ADDED, child);
         log("Added child container: " + child.getName());
     }
 
@@ -49,7 +54,23 @@ public abstract class ContainerBase extends LifecycleBase implements Container {
     @Override
     public void removeChild(Container child) {
         children.remove(child.getName());
+        fireContainerEvent(ContainerEvent.CHILD_REMOVED, child);
         log("Removed child container: " + child.getName());
+    }
+
+    public void addContainerListener(ContainerListener listener) {
+        listeners.add(listener);
+    }
+
+    public void removeContainerListener(ContainerListener listener) {
+        listeners.remove(listener);
+    }
+
+    protected void fireContainerEvent(String type, Object data) {
+        ContainerEvent event = new ContainerEvent(this, type, data);
+        for (ContainerListener listener : listeners) {
+            listener.containerEvent(event);
+        }
     }
 
     protected void log(String message) {

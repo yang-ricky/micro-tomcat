@@ -23,11 +23,12 @@ public class Engine extends ContainerBase {
 
     @Override
     public void invoke(Request request, Response response) {
-        String hostHeader = request.getHeader("Host");
-        String hostName = hostHeader != null ? hostHeader.split(":")[0] : defaultHost;
+        String hostName = request.getServerName();
+        if (hostName == null) {
+            hostName = defaultHost;
+        }
         
         Host host = (Host) findChild(hostName);
-        
         if (host == null) {
             host = (Host) findChild(defaultHost);
         }
@@ -35,11 +36,10 @@ public class Engine extends ContainerBase {
         if (host != null) {
             host.invoke(request, response);
         } else {
-            log("No matching host found for: " + hostName);
             try {
-                response.sendError(404, "No matching host found");
+                response.sendError(400, "Invalid virtual host: " + hostName);
             } catch (IOException e) {
-                log("Error sending 404 response: " + e.getMessage());
+                log("Error sending 400 response: " + e.getMessage());
             }
         }
     }
