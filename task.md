@@ -159,13 +159,13 @@
 
 #### 任务15：Pipeline-Valve 处理链实现
 **场景**：灵活的请求处理链
-- [ ] 设计并实现 Pipeline 接口，包含 `addValve()`, `getValves()`, `invoke()` 等核心方法
-- [ ] 设计并实现 Valve 接口，定义 `invoke(Request, Response, ValveContext)` 方法
-- [ ] 实现基础阀门：AccessLogValve（访问日志）、AuthenticatorValve（认证）、StandardValve（标准处理）
-- [ ] 实现 StandardPipeline 作为默认实现，支持阀门的动态添加、移除和排序
+- [x] 设计并实现 Pipeline 接口，包含 `addValve()`, `getValves()`, `invoke()` 等核心方法
+- [x] 设计并实现 Valve 接口，定义 `invoke(Request, Response, ValveContext)` 方法
+- [x] 实现基础阀门：AccessLogValve（访问日志）、AuthenticatorValve（认证）、StandardValve（标准处理）
+- [x] 实现 StandardPipeline 作为默认实现，支持阀门的动态添加、移除和排序
 **产出要求**：
-- [ ] 请求能够按照配置的 Valve 链依次处理
-- [ ] 提供示例 Valve 实现（如请求计数、访问控制）
+- [x] 请求能够按照配置的 Valve 链依次处理
+- [x] 提供示例 Valve 实现（如请求计数、访问控制）
 
 #### 任务16：生命周期管理
 **场景**：标准化组件生命周期
