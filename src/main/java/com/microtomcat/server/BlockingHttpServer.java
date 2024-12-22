@@ -30,7 +30,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
         // 添加应用上下文
         contextManager.createContext("/app1", config.getWebRoot() + "/app1");
         contextManager.createContext("/app2", config.getWebRoot() + "/app2");
-        
+
         try {
             this.processorPool = new ProcessorPool(
                 100,
