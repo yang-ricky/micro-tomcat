@@ -14,8 +14,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.context.ContextManager;
 import java.io.IOException;
+import com.microtomcat.lifecycle.LifecycleBase;
+import com.microtomcat.lifecycle.LifecycleException;
 
-public class ProcessorPool {
+public class ProcessorPool extends LifecycleBase {
     private final BlockingQueue<Processor> pool;
     private final List<Processor> allProcessors;
     private final int maxProcessors;
@@ -40,6 +42,44 @@ public class ProcessorPool {
         for (int i = 0; i < initialProcessors; i++) {
             createProcessor(new SessionManager());
         }
+    }
+
+    @Override
+    protected void initInternal() throws LifecycleException {
+        log("Initializing ProcessorPool with " + allProcessors.size() + " processors");
+        for (Processor processor : allProcessors) {
+            processor.init();
+        }
+    }
+
+    @Override
+    protected void startInternal() throws LifecycleException {
+        log("Starting ProcessorPool");
+        for (Processor processor : allProcessors) {
+            processor.start();
+        }
+    }
+
+    @Override
+    protected void stopInternal() throws LifecycleException {
+        log("Stopping ProcessorPool");
+        for (Processor processor : allProcessors) {
+            processor.stop();
+        }
+    }
+
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        log("Destroying ProcessorPool");
+        for (Processor processor : allProcessors) {
+            processor.destroy();
+        }
+        pool.clear();
+        allProcessors.clear();
+    }
+
+    private void log(String message) {
+        System.out.println("[ProcessorPool] " + message);
     }
 
     public Processor getProcessor(long timeout) throws InterruptedException {

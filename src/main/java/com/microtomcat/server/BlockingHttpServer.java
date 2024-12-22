@@ -38,22 +38,42 @@ public class BlockingHttpServer extends AbstractHttpServer {
                 contextManager
             );
             this.connector = new Connector(config.getPort(), processorPool);
-        } catch (IOException e) {
+            
+            // 初始化所有组件
+            contextManager.init();
+            processorPool.init();
+            connector.init();
+        } catch (Exception e) {
             throw new RuntimeException("Failed to initialize server", e);
         }
     }
 
     @Override
     public void start() throws IOException {
-        log("Blocking server started on port: " + config.getPort());
-        
-        // 启动连接处理线程
-        for (int i = 0; i < config.getThreadPoolSize(); i++) {
-            executorService.submit(new ConnectionHandler());
+        try {
+            // 启动所有组件
+            contextManager.start();
+            processorPool.start();
+            connector.start();
+            
+            log("Blocking server started on port: " + config.getPort());
+            
+            // 启动连接处理线程
+            for (int i = 0; i < config.getThreadPoolSize(); i++) {
+                executorService.submit(new ConnectionHandler());
+            }
+            
+            // 等待服务器停止
+            synchronized (this) {
+                try {
+                    this.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to start server", e);
         }
-        
-        // 启动连接接收线程
-        connector.run();
     }
 
     private class ConnectionHandler implements Runnable {
@@ -108,14 +128,15 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     @Override
     protected void stop() {
-        running = false;
         try {
-            if (connector != null) {
-                connector.close();
-            }
+            // 停止所有组件
+            connector.stop();
+            processorPool.stop();
+            contextManager.stop();
+            
+            executorService.shutdown();
         } catch (Exception e) {
-            log("Error closing server socket: " + e.getMessage());
+            log("Error while stopping server: " + e.getMessage());
         }
-        executorService.shutdown();
     }
 } 

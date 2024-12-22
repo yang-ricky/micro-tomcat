@@ -17,56 +17,64 @@ public class StandardPipeline extends LifecycleBase implements Pipeline {
 
     @Override
     protected void initInternal() throws LifecycleException {
-        log("Initializing pipeline");
+        log("Initializing pipeline with " + valves.size() + " valves");
         // 初始化所有阀门
         for (Valve valve : valves) {
+            log("Initializing valve: " + valve.getClass().getSimpleName());
             if (valve instanceof Lifecycle) {
                 ((Lifecycle) valve).init();
             }
         }
         if (basic instanceof Lifecycle) {
+            log("Initializing basic valve: " + basic.getClass().getSimpleName());
             ((Lifecycle) basic).init();
         }
     }
 
     @Override
     protected void startInternal() throws LifecycleException {
-        log("Starting pipeline");
+        log("Starting pipeline with " + valves.size() + " valves");
         // 启动所有阀门
         for (Valve valve : valves) {
+            log("Starting valve: " + valve.getClass().getSimpleName());
             if (valve instanceof Lifecycle) {
                 ((Lifecycle) valve).start();
             }
         }
         if (basic instanceof Lifecycle) {
+            log("Starting basic valve: " + basic.getClass().getSimpleName());
             ((Lifecycle) basic).start();
         }
     }
 
     @Override
     protected void stopInternal() throws LifecycleException {
-        log("Stopping pipeline");
+        log("Stopping pipeline with " + valves.size() + " valves");
         // 停止所有阀门
         for (Valve valve : valves) {
+            log("Stopping valve: " + valve.getClass().getSimpleName());
             if (valve instanceof Lifecycle) {
                 ((Lifecycle) valve).stop();
             }
         }
         if (basic instanceof Lifecycle) {
+            log("Stopping basic valve: " + basic.getClass().getSimpleName());
             ((Lifecycle) basic).stop();
         }
     }
 
     @Override
     protected void destroyInternal() throws LifecycleException {
-        log("Destroying pipeline");
+        log("Destroying pipeline with " + valves.size() + " valves");
         // 销毁所有阀门
         for (Valve valve : valves) {
+            log("Destroying valve: " + valve.getClass().getSimpleName());
             if (valve instanceof Lifecycle) {
                 ((Lifecycle) valve).destroy();
             }
         }
         if (basic instanceof Lifecycle) {
+            log("Destroying basic valve: " + basic.getClass().getSimpleName());
             ((Lifecycle) basic).destroy();
         }
     }

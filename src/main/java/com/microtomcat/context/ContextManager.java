@@ -3,13 +3,48 @@ package com.microtomcat.context;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-public class ContextManager {
+import com.microtomcat.lifecycle.LifecycleBase;
+import com.microtomcat.lifecycle.LifecycleException;
+public class ContextManager extends LifecycleBase {
     private final Map<String, Context> contexts = new ConcurrentHashMap<>();
     private final String webRoot;
 
     public ContextManager(String webRoot) {
         this.webRoot = webRoot;
+    }
+
+    @Override
+    protected void initInternal() throws LifecycleException {
+        log("Initializing ContextManager");
+        // 初始化所有上下文
+        for (Context context : contexts.values()) {
+            context.init();
+        }
+    }
+
+    @Override
+    protected void startInternal() throws LifecycleException {
+        log("Starting ContextManager");
+        for (Context context : contexts.values()) {
+            context.start();
+        }
+    }
+
+    @Override
+    protected void stopInternal() throws LifecycleException {
+        log("Stopping ContextManager");
+        for (Context context : contexts.values()) {
+            context.stop();
+        }
+    }
+
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        log("Destroying ContextManager");
+        for (Context context : contexts.values()) {
+            context.destroy();
+        }
+        contexts.clear();
     }
 
     public void createContext(String contextPath, String docBase) {
@@ -35,6 +70,6 @@ public class ContextManager {
     }
 
     private void log(String message) {
-        System.out.println(message);
+        System.out.println("[ContextManager] " + message);
     }
 }
