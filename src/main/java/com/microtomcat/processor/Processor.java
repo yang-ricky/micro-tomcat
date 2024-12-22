@@ -4,6 +4,7 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.context.Context;
 import com.microtomcat.context.ContextManager;
+import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.pipeline.Pipeline;
 import com.microtomcat.pipeline.StandardPipeline;
 import com.microtomcat.pipeline.valve.AccessLogValve;
@@ -17,13 +18,13 @@ import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-
-public class Processor {
+import com.microtomcat.lifecycle.LifecycleException;
+public class Processor extends LifecycleBase {
     private final String webRoot;
     private final ServletLoader servletLoader;
     private final SessionManager sessionManager;
     private final ContextManager contextManager;
-    private final Pipeline pipeline;
+    private final StandardPipeline pipeline;
 
     public Processor(String webRoot, ServletLoader servletLoader, 
                     SessionManager sessionManager, ContextManager contextManager) {
@@ -40,6 +41,30 @@ public class Processor {
         
         // 设置基础阀门处理请求
         pipeline.setBasic(new StandardValve(webRoot, servletLoader));
+    }
+
+    @Override
+    protected void initInternal() throws LifecycleException {
+        log("Initializing processor");
+    }
+
+    @Override
+    protected void startInternal() throws LifecycleException {
+        log("Starting processor");
+    }
+
+    @Override
+    protected void stopInternal() throws LifecycleException {
+        log("Stopping processor");
+    }
+
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        log("Destroying processor");
+    }
+
+    private void log(String message) {
+        System.out.println("[Processor] " + message);
     }
 
     public void process(Socket socket) {
