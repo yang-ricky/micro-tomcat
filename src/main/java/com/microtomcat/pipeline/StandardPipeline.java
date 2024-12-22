@@ -1,15 +1,75 @@
 package com.microtomcat.pipeline;
 
+import com.microtomcat.connector.Request;
+import com.microtomcat.connector.Response;
+import com.microtomcat.lifecycle.LifecycleBase;
+import com.microtomcat.lifecycle.LifecycleException;
+// import com.microtomcat.pipeline.valve.Valve;
+import com.microtomcat.servlet.ServletException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import com.microtomcat.connector.Request;
-import com.microtomcat.connector.Response;
-import com.microtomcat.servlet.ServletException;
+import com.microtomcat.lifecycle.Lifecycle;
 
-public class StandardPipeline implements Pipeline {
+public class StandardPipeline extends LifecycleBase implements Pipeline {
     private final List<Valve> valves = new ArrayList<>();
     private Valve basic = null;
+
+    @Override
+    protected void initInternal() throws LifecycleException {
+        log("Initializing pipeline");
+        // 初始化所有阀门
+        for (Valve valve : valves) {
+            if (valve instanceof Lifecycle) {
+                ((Lifecycle) valve).init();
+            }
+        }
+        if (basic instanceof Lifecycle) {
+            ((Lifecycle) basic).init();
+        }
+    }
+
+    @Override
+    protected void startInternal() throws LifecycleException {
+        log("Starting pipeline");
+        // 启动所有阀门
+        for (Valve valve : valves) {
+            if (valve instanceof Lifecycle) {
+                ((Lifecycle) valve).start();
+            }
+        }
+        if (basic instanceof Lifecycle) {
+            ((Lifecycle) basic).start();
+        }
+    }
+
+    @Override
+    protected void stopInternal() throws LifecycleException {
+        log("Stopping pipeline");
+        // 停止所有阀门
+        for (Valve valve : valves) {
+            if (valve instanceof Lifecycle) {
+                ((Lifecycle) valve).stop();
+            }
+        }
+        if (basic instanceof Lifecycle) {
+            ((Lifecycle) basic).stop();
+        }
+    }
+
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        log("Destroying pipeline");
+        // 销毁所有阀门
+        for (Valve valve : valves) {
+            if (valve instanceof Lifecycle) {
+                ((Lifecycle) valve).destroy();
+            }
+        }
+        if (basic instanceof Lifecycle) {
+            ((Lifecycle) basic).destroy();
+        }
+    }
 
     @Override
     public void addValve(Valve valve) {
@@ -37,31 +97,32 @@ public class StandardPipeline implements Pipeline {
     }
 
     @Override
-    public void invoke(Request request, Response response) 
-            throws IOException, ServletException {
-        StandardPipelineValveContext context = 
-            new StandardPipelineValveContext(valves, basic);
+    public void invoke(Request request, Response response) throws IOException, ServletException {
+        // 创建阀门上下文并开始处理
+        StandardPipelineValveContext context = new StandardPipelineValveContext();
         context.invokeNext(request, response);
     }
 
-    private static class StandardPipelineValveContext implements ValveContext {
-        private final Valve[] valves;
-        private final Valve basic;
-        private int stage = 0;
+    private void log(String message) {
+        System.out.println("[Pipeline] " + message);
+    }
 
-        public StandardPipelineValveContext(List<Valve> valveList, Valve basic) {
-            this.valves = valveList.toArray(new Valve[0]);
-            this.basic = basic;
-        }
+    // 内部阀门上下文类
+    private class StandardPipelineValveContext implements ValveContext {
+        private int stage = 0;
 
         @Override
         public void invokeNext(Request request, Response response) 
                 throws IOException, ServletException {
-            int subscript = stage++;
+            int subscript = stage;
+            stage++;
             
-            if (subscript < valves.length) {
-                valves[subscript].invoke(request, response, this);
-            } else if (basic != null) {
+            // 首先调用所有普通阀门
+            if (subscript < valves.size()) {
+                valves.get(subscript).invoke(request, response, this);
+            }
+            // 最后调用基础阀门
+            else if (subscript == valves.size() && basic != null) {
                 basic.invoke(request, response, this);
             }
         }

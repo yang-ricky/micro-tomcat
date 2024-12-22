@@ -27,12 +27,12 @@ public class StandardValve implements Valve {
         
         // 检查是否是 Servlet 请求
         if (uri.startsWith("/servlet/")) {
-            System.out.println("StandardValve: Processing Servlet request");
+            System.out.println("[StandardValve] Processing Servlet request");
             // 处理 Servlet 请求
             Servlet servlet = servletLoader.loadServlet(uri);
             servlet.service(request, response);
         } else {
-            System.out.println("StandardValve: Processing static resource request");
+            System.out.println("[StandardValve] Processing static resource request");
             // 处理静态资源请求
             response.sendStaticResource();
         }

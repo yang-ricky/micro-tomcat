@@ -4,8 +4,9 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import java.io.IOException;
 import com.microtomcat.servlet.ServletException;
+import com.microtomcat.lifecycle.Lifecycle;
 
-public interface Pipeline {
+public interface Pipeline extends Lifecycle {
     void addValve(Valve valve);
     Valve[] getValves();
     void removeValve(Valve valve);
