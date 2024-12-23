@@ -50,12 +50,12 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
                 return c;
             }
 
-            // 2. 对以下包的类，一律交给父加载器
-            if (name.startsWith("com.microtomcat.servlet.") || 
-                name.contains("App1Servlet") ||
-                name.contains("App2Servlet") ||
-                name.startsWith("com.microtomcat.example.") ||  // 添加这一行
-                "com.microtomcat.example.HelloServlet".equals(name)) {
+            log("ricky: " + name);
+
+            // 2. 对框架类，委托给父加载器
+            if (name.startsWith("com.microtomcat.example.HelloServlet")
+            || name.startsWith("com.microtomcat.servlet.HttpServlet")
+            ) {
                 log("Delegating " + name + " to parent because it's a framework class");
                 try {
                     return getParent().loadClass(name);

@@ -16,11 +16,6 @@ public class CommonClassLoader extends MicroTomcatClassLoader {
 
         // 添加项目编译输出目录，里面包含 com.microtomcat.servlet.*、com.microtomcat.example.* 等
         addRepository("target/classes");
-        
-        // 添加各个 webapp 的类路径
-        addRepository("webroot/WEB-INF");
-        addRepository("webroot/app1/WEB-INF/classes");
-        addRepository("webroot/app2/WEB-INF/classes");
 
         log("CommonClassLoader repositories:");
         for (File path : repositoryPaths) {

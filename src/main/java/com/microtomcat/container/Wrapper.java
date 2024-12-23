@@ -29,10 +29,21 @@ public class Wrapper extends ContainerBase {
     @Override
     protected void initInternal() throws LifecycleException {
         try {
-            // 使用 Context 的类加载器加载 Servlet 类
-            ClassLoader loader = getParent().getClass().getClassLoader();
-            Class<?> servletClass = loader.loadClass(this.servletClass);
+            Context context = (Context) getParent();
+            Class<?> servletClass;
             
+            // 1. 如果是框架提供的 Servlet (com.microtomcat.example.*)，用系统类加载器
+            if (this.servletClass.startsWith("com.microtomcat.")) {
+                ClassLoader loader = getParent().getClass().getClassLoader();
+                servletClass = loader.loadClass(this.servletClass);
+            } 
+            // 2. 如果是应用的 Servlet，用对应的 WebAppClassLoader
+            else {
+                ClassLoader loader = context.getWebAppClassLoader();
+                log("Loading servlet class: " + this.servletClass + " using loader: " + loader);
+                servletClass = loader.loadClass(this.servletClass);
+            }
+
             // 确保它实现了 Servlet 接口
             if (!com.microtomcat.servlet.Servlet.class.isAssignableFrom(servletClass)) {
                 throw new LifecycleException("Class " + servletClass + " is not a Servlet");
