@@ -39,7 +39,7 @@ public class Context extends ContainerBase {
                 // 注册 App1Servlet
                 log("Registering App1Servlet...");
                 Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
-                addChild(app1Wrapper);
+                //addChild(app1Wrapper);
             } 
 
             // else if (name.equals("/app1")) {  // app1 上下文
