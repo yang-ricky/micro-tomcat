@@ -50,25 +50,24 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
                 return c;
             }
 
-            // 2. 对 com.microtomcat.servlet.* 的类，一律交给父加载器(避免每个webapp重复加载)
-            if (name.startsWith("com.microtomcat.servlet.")) {
-                log("Delegating " + name + " to parent because it's servlet API");
-                return getParent().loadClass(name);
+            // 2. 对以下包的类，一律交给父加载器
+            if (name.startsWith("com.microtomcat.servlet.") || 
+                name.startsWith("com.microtomcat.example.") ||  // 添加这一行
+                "com.microtomcat.example.HelloServlet".equals(name)) {
+                log("Delegating " + name + " to parent because it's a framework class");
+                try {
+                    return getParent().loadClass(name);
+                } catch (ClassNotFoundException e) {
+                    log("Parent failed to load " + name + ", will try locally");
+                }
             }
 
-            // 3. 如果是 HelloServlet（公用示例），也交给 parent
-            //    (保证所有webapp都只会加载到同一份 HelloServlet)
-            if ("com.microtomcat.example.HelloServlet".equals(name)) {
-                log("Delegating HelloServlet to parent");
-                return getParent().loadClass(name);
-            }
-
-            // 4. 其余类 -> 先让父类尝试(双亲委派)，如果没找到再自己 findClass
+            // 3. 其他类先尝试自己加载
             try {
-                return super.loadClass(name);
+                return findClass(name);
             } catch (ClassNotFoundException e) {
-                // 真的找不到就抛出
-                throw e;
+                // 4. 最后再尝试父加载器
+                return getParent().loadClass(name);
             }
         }
     }
@@ -90,7 +89,7 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
 
             // 如果是 rootContext (webroot 对应 path=""),
             // 那么有可能要加载 WebRootServlet、或者你想把 "HelloServlet" 也放这边？
-            // 不过我们已经在 loadClass() 里对 HelloServlet 做了“交给 parent”的逻辑
+            // 不过我们已经在 loadClass() 里对 HelloServlet 做了"交给 parent"的逻辑
             // 所以这里，如果你想保持旧的com.microtomcat.example.xxx 逻辑，可以这样：
             if (webAppPath.equals("webroot")) {
                 String maybeFullName = "com.microtomcat.example." + servletName;
@@ -118,7 +117,7 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
 
     /**
      * WebAppClassLoader 覆盖 findClass，
-     * 以实现“从 webAppPath/WEB-INF/classes 下的 .class 文件”加载
+     * 以实现"从 webAppPath/WEB-INF/classes 下的 .class 文件"加载
      */
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {

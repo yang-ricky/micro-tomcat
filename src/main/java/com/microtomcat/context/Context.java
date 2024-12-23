@@ -35,8 +35,13 @@ public class Context extends ContainerBase {
                 log("Registering HelloServlet...");
                 Wrapper helloWrapper = new Wrapper("HelloServlet", "com.microtomcat.example.HelloServlet");
                 addChild(helloWrapper);
+            } else if (name.equals("/app1")) {  // app1 上下文
+                // 注册 App1Servlet
+                log("Registering App1Servlet...");
+                Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
+                addChild(app1Wrapper);
             } 
-            
+
             // else if (name.equals("/app1")) {  // app1 上下文
             //     // 注册 App1Servlet
             //     log("Registering App1Servlet...");
