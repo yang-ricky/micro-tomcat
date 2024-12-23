@@ -6,14 +6,15 @@ import com.microtomcat.container.Wrapper;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.servlet.ServletLoader;
 import com.microtomcat.session.SessionManager;
+import com.microtomcat.loader.WebAppClassLoader;
+import com.microtomcat.loader.ClassLoaderManager;
 import java.io.File;
 import java.io.IOException;
 
 public class Context extends ContainerBase {
     private final String docBase;
-    private final ServletLoader servletLoader;
+    private final WebAppClassLoader webAppClassLoader;
     private final SessionManager sessionManager;
 
     public Context(String name, String docBase) throws IOException {
@@ -21,10 +22,8 @@ public class Context extends ContainerBase {
         this.docBase = docBase;
         this.sessionManager = new SessionManager();
         
-        String classesPath = docBase + "/WEB-INF/classes";
-        this.servletLoader = new ServletLoader(docBase, classesPath);
+        this.webAppClassLoader = ClassLoaderManager.createWebAppClassLoader(docBase);
         
-        // 注册默认的 Servlet
         registerDefaultServlets();
     }
 
@@ -40,13 +39,21 @@ public class Context extends ContainerBase {
                 // 注册 App1Servlet
                 log("Registering App1Servlet...");
                 Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
-                addChild(app1Wrapper);
-            } else if (name.equals("/app2")) {  // app2 上下文
-                // 注册 App2Servlet
-                log("Registering App2Servlet...");
-                Wrapper app2Wrapper = new Wrapper("App2Servlet", "App2Servlet");
-                addChild(app2Wrapper);
-            }
+                //TODO: 有错误,需要修改
+                //addChild(app1Wrapper);
+            } 
+
+            // else if (name.equals("/app1")) {  // app1 上下文
+            //     // 注册 App1Servlet
+            //     log("Registering App1Servlet...");
+            //     Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
+            //     addChild(app1Wrapper);
+            // } else if (name.equals("/app2")) {  // app2 上下文
+            //     // 注册 App2Servlet
+            //     log("Registering App2Servlet...");
+            //     Wrapper app2Wrapper = new Wrapper("App2Servlet", "App2Servlet");
+            //     addChild(app2Wrapper);
+            // }
 
             log("Successfully registered servlets for context: " + name);
         } catch (Exception e) {
@@ -59,8 +66,8 @@ public class Context extends ContainerBase {
         return docBase;
     }
 
-    public ServletLoader getServletLoader() {
-        return servletLoader;
+    public WebAppClassLoader getWebAppClassLoader() {
+        return webAppClassLoader;
     }
 
     public SessionManager getSessionManager() {
@@ -165,6 +172,6 @@ public class Context extends ContainerBase {
     @Override
     protected void destroyInternal() throws LifecycleException {
         log("Destroying context: " + name);
-        servletLoader.destroy();
+        webAppClassLoader.destroy();
     }
 } 
