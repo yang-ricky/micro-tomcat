@@ -23,7 +23,22 @@ public class CommonClassLoader extends MicroTomcatClassLoader {
         }
     }
 
-    // 注意，这里并不覆盖 findClass()，父类里默认会抛 ClassNotFoundException
-    // 因为我们已经 addURL(...) 进去了 target/classes，所以 URLClassLoader 能直接找到 class
-    // 如果想手动做 FileInputStream -> defineClass，也可以覆盖 findClass()
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        // 将类名转换为文件路径
+        String classFilePath = name.replace('.', '/') + ".class";
+        
+        // 在所有仓库路径中查找类文件
+        for (File repository : repositoryPaths) {
+            File classFile = new File(repository, classFilePath);
+            byte[] classData = loadClassData(classFile);
+            if (classData != null) {
+                // 找到类文件，定义并返回类
+                return defineClass(name, classData, 0, classData.length);
+            }
+        }
+        
+        // 找不到类文件，抛出异常
+        throw new ClassNotFoundException("Could not find class: " + name);
+    }
 }
