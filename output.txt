@@ -1,0 +1,664 @@
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/CatalinaClassLoader.java ===
+
+package com.microtomcat.loader;
+
+import java.net.URL;
+import java.io.IOException;
+
+public class CatalinaClassLoader extends MicroTomcatClassLoader {
+    public CatalinaClassLoader(ClassLoader parent) throws IOException {
+        super(new URL[0], parent);
+        
+        // 只添加服务器核心类路径(不含 Servlet API jar 时，也可在这里放 .class)
+        // 你可以把 com.microtomcat.servlet.*、HelloServlet 都编译到 target/classes
+        // 或者放到 lib/server 里
+        addRepository("lib/server");
+    }
+
+    @Override
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        synchronized (getClassLoadingLock(name)) {
+            // 不做额外处理，直接走双亲委派
+            return super.loadClass(name);
+        }
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/ClassLoaderManager.java ===
+
+package com.microtomcat.loader;
+
+import java.io.IOException;
+
+public class ClassLoaderManager {
+    private static CommonClassLoader commonLoader;
+    private static CatalinaClassLoader catalinaLoader;
+    private static SharedClassLoader sharedLoader;
+    private static boolean initialized = false;
+    
+    public static synchronized void init() throws IOException {
+        if (initialized) {
+            return;
+        }
+        
+        log("Initializing ClassLoaderManager");
+        
+        // 1. 初始化 CommonClassLoader
+        commonLoader = new CommonClassLoader();
+        log("Created CommonClassLoader: " + commonLoader);
+        
+        // 2. 初始化其他加载器
+        catalinaLoader = new CatalinaClassLoader(commonLoader);
+        log("Created CatalinaClassLoader: " + catalinaLoader + " with parent: " + commonLoader);
+        
+        sharedLoader = new SharedClassLoader(commonLoader);
+        log("Created SharedClassLoader: " + sharedLoader + " with parent: " + commonLoader);
+        
+        // 3. 设置当前线程的上下文类加载器
+        Thread.currentThread().setContextClassLoader(commonLoader);
+        log("Set context ClassLoader to: " + commonLoader);
+        
+        initialized = true;
+    }
+    
+    public static WebAppClassLoader createWebAppClassLoader(String webAppPath) throws IOException {
+        if (!initialized) {
+            init();
+        }
+        
+        log("Creating WebAppClassLoader for: " + webAppPath);
+        log("Using parent loader: " + commonLoader);
+        WebAppClassLoader loader = new WebAppClassLoader(webAppPath, commonLoader);
+        log("Created WebAppClassLoader: " + loader);
+        return loader;
+    }
+    
+    public static ClassLoader getCommonLoader() {
+        return commonLoader;
+    }
+    
+    public static ClassLoader getCatalinaLoader() {
+        return catalinaLoader;
+    }
+    
+    public static ClassLoader getSharedLoader() {
+        return sharedLoader;
+    }
+    
+    private static void log(String message) {
+        System.out.println("[ClassLoaderManager] " + message);
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/CommonClassLoader.java ===
+
+package com.microtomcat.loader;
+
+import java.net.URL;
+import java.io.IOException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.ByteArrayOutputStream;
+
+public class CommonClassLoader extends MicroTomcatClassLoader {
+    public CommonClassLoader() throws IOException {
+        // parent = 系统类加载器
+        super(new URL[0], ClassLoader.getSystemClassLoader());
+        
+        // 添加框架核心类路径，也就是 target/classes
+        // 里包含 com.microtomcat.servlet.*、com.microtomcat.example.HelloServlet 等容器/示例类
+        addRepository("target/classes");
+        
+        log("CommonClassLoader repositories:");
+        for (File path : repositoryPaths) {
+            log(" - " + path.getAbsolutePath());
+        }
+    }
+
+    @Override
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        synchronized (getClassLoadingLock(name)) {
+            log("Attempting to load class: " + name);
+            
+            // 1. 检查是否已加载
+            Class<?> c = findLoadedClass(name);
+            if (c != null) {
+                log("Class already loaded: " + name + " by " + c.getClassLoader());
+                return c;
+            }
+            
+            // 2. 先让父加载器(系统)试试
+            try {
+                c = getParent().loadClass(name);
+                log("Class loaded by parent: " + name);
+                return c;
+            } catch (ClassNotFoundException e) {
+                log("Parent couldn't load class: " + name + ", trying locally");
+            }
+            
+            // 3. 父加载器也加载不了，就本地加载(从 target/classes)
+            try {
+                c = findClass(name);
+                log("Successfully loaded class locally: " + name);
+                return c;
+            } catch (ClassNotFoundException e) {
+                log("Failed to load class: " + name);
+                throw e;
+            }
+        }
+    }
+    
+    
+    private byte[] loadClassData(File classFile) {
+        if (!classFile.exists()) {
+            return null;
+        }
+        
+        try (FileInputStream fis = new FileInputStream(classFile);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                bos.write(buffer, 0, bytesRead);
+            }
+            log("Found class file: " + classFile.getAbsolutePath());
+            return bos.toByteArray();
+        } catch (IOException e) {
+            log("Error reading class file: " + classFile + ", error: " + e.getMessage());
+            return null;
+        }
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/MicroTomcatClassLoader.java ===
+
+package com.microtomcat.loader;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
+
+public abstract class MicroTomcatClassLoader extends URLClassLoader {
+    protected final List<File> repositoryPaths = new ArrayList<>();
+    
+    public MicroTomcatClassLoader(URL[] urls, ClassLoader parent) {
+        super(urls, parent);
+    }
+    
+    protected void addRepository(String path) throws IOException {
+        File repository = new File(path);
+        if (!repository.exists()) {
+            repository.mkdirs();
+        }
+        if (!repository.isDirectory()) {
+            throw new IOException(path + " is not a directory");
+        }
+        repositoryPaths.add(repository);
+        addURL(repository.toURI().toURL());
+    }
+    
+    protected void log(String message) {
+        System.out.println("[" + getClass().getSimpleName() + "] " + message);
+    }
+    
+    @Override
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        synchronized (getClassLoadingLock(name)) {
+            log("Attempting to load class: " + name);
+            
+            // 1. 如果已经加载过，直接返回
+            Class<?> c = findLoadedClass(name);
+            if (c != null) {
+                log("Class already loaded: " + name);
+                return c;
+            }
+            
+            // 2. 双亲委派
+            try {
+                c = getParent().loadClass(name);
+                log("Class loaded by parent: " + name);
+                return c;
+            } catch (ClassNotFoundException e) {
+                // 父加载器无法加载，尝试自己加载
+                log("Parent couldn't load class: " + name + ", trying locally");
+            }
+            
+            // 3. 从本地仓库加载
+            try {
+                c = findClass(name);
+                log("Successfully loaded class locally: " + name);
+                return c;
+            } catch (ClassNotFoundException e) {
+                log("Failed to load class: " + name);
+                throw e;
+            }
+        }
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/SharedClassLoader.java ===
+
+package com.microtomcat.loader;
+
+import java.net.URL;
+import java.io.IOException;
+
+public class SharedClassLoader extends MicroTomcatClassLoader {
+    public SharedClassLoader(ClassLoader parent) throws IOException {
+        super(new URL[0], parent);
+        
+        // 添加共享类库路径(若有的话)
+        addRepository("lib/shared");
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/loader/WebAppClassLoader.java ===
+
+package com.microtomcat.loader;
+
+import java.io.*;
+import java.net.URL;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import com.microtomcat.servlet.HttpServlet;
+import com.microtomcat.servlet.Servlet;
+import com.microtomcat.servlet.ServletException;
+
+public class WebAppClassLoader extends MicroTomcatClassLoader {
+    private final String webAppPath;
+    private final Map<String, Servlet> servletCache = new ConcurrentHashMap<>();
+
+    public WebAppClassLoader(String webAppPath, ClassLoader parent) throws IOException {
+        super(new URL[0], parent);
+        this.webAppPath = webAppPath;
+
+        // 1. 添加当前应用的类路径
+        addRepository(webAppPath + "/WEB-INF/classes");
+
+        // 2. 如果是根Context，添加其他必要的Web应用特定类路径(如 jar)
+        if (webAppPath.equals("webroot")) {
+            // addRepository("webroot/WEB-INF/lib");
+        }
+
+        log("Class path repositories:");
+        for (File path : repositoryPaths) {
+            log(" - " + path.getAbsolutePath());
+        }
+    }
+
+    @Override
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        synchronized (getClassLoadingLock(name)) {
+            log("Attempting to load class: " + name);
+
+            // 1. 先检查是否已加载
+            Class<?> c = findLoadedClass(name);
+            if (c != null) {
+                log("Class already loaded: " + name + " by " + c.getClassLoader());
+                return c;
+            }
+
+            // 如果是 com.microtomcat.servlet. 下的类，则一定交给父加载器
+            if (name.startsWith("com.microtomcat.servlet.")) {
+                log("Delegating " + name + " to parent");
+                return getParent().loadClass(name);
+            }
+
+            // ============ 额外加的关键逻辑: 如果是 HelloServlet，也只给父加载器 ============
+            if (name.equals("com.microtomcat.example.HelloServlet")) {
+                log("Delegating HelloServlet to parent");
+                return getParent().loadClass(name);
+            }
+
+            // 其余类按默认双亲委派(先 parent, 再自己)
+            return super.loadClass(name);
+        }
+    }
+
+    // 缓存已加载的Servlet实例
+    public Servlet loadServlet(String servletPath) throws ServletException {
+        try {
+            if (servletCache.containsKey(servletPath)) {
+                return servletCache.get(servletPath);
+            }
+
+            String servletName = servletPath.substring(servletPath.lastIndexOf("/") + 1);
+            Class<?> servletClass;
+
+            // 如果是根Context(""), 则可能要加载 com.microtomcat.example.HelloServlet
+            // 但我们已经在 loadClass() 里对 HelloServlet 做了「交给 parent」的逻辑
+            // 所以这里依然写: loadClass("com.microtomcat.example."+ servletName)
+            // 就能从 parent 拿到
+            if (webAppPath.equals("webroot")) {
+                servletClass = loadClass("com.microtomcat.example." + servletName);
+            } else {
+                // 对 /app1、/app2，直接用 "App1Servlet"/"App2Servlet" 这种类名
+                servletClass = loadClass(servletName);
+            }
+
+            if (!Servlet.class.isAssignableFrom(servletClass)) {
+                throw new ServletException("Class " + servletClass.getName() + " is not a Servlet");
+            }
+
+            Servlet servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
+            servlet.init();
+            servletCache.put(servletPath, servlet);
+            return servlet;
+
+        } catch (Exception e) {
+            throw new ServletException("Error loading servlet: " + servletPath, e);
+        }
+    }
+
+    public void destroy() {
+        servletCache.values().forEach(Servlet::destroy);
+        servletCache.clear();
+        try {
+            close();
+        } catch (IOException e) {
+            log("Error destroying WebAppClassLoader: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        log("Finding class: " + name);
+
+        // 将类名转换为文件路径
+        String classFilePath = name.replace('.', '/') + ".class";
+        File classFile = new File(webAppPath + "/WEB-INF/classes", classFilePath);
+        log("Looking for application servlet class: " + classFile.getAbsolutePath());
+        byte[] classData = loadClassData(classFile);
+
+        if (classData == null) {
+            throw new ClassNotFoundException("Could not find class: " + name);
+        }
+
+        return defineClass(name, classData, 0, classData.length);
+    }
+
+    private byte[] loadClassData(File classFile) {
+        if (!classFile.exists()) {
+            return null;
+        }
+
+        try (FileInputStream fis = new FileInputStream(classFile);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                bos.write(buffer, 0, bytesRead);
+            }
+            log("Found class file: " + classFile.getAbsolutePath());
+            return bos.toByteArray();
+        } catch (IOException e) {
+            log("Error reading class file: " + classFile + ", error: " + e.getMessage());
+            return null;
+        }
+    }
+}
+
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/server/BlockingHttpServer.java ===
+
+package com.microtomcat.server;
+
+import com.microtomcat.connector.Connector;
+import com.microtomcat.processor.Processor;
+import com.microtomcat.processor.ProcessorPool;
+import com.microtomcat.servlet.ServletLoader;
+import com.microtomcat.session.SessionManager;
+import com.microtomcat.context.Context;
+import com.microtomcat.container.Engine;
+import com.microtomcat.container.Host;
+import com.microtomcat.lifecycle.LifecycleException;
+
+import java.io.*;
+import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class BlockingHttpServer extends AbstractHttpServer {
+    private final ExecutorService executorService;
+    private final ProcessorPool processorPool;
+    private final Connector connector;
+    private final Engine engine;
+    private volatile boolean running = true;
+
+    public BlockingHttpServer(ServerConfig config) {
+        super(config);
+        this.executorService = Executors.newFixedThreadPool(config.getThreadPoolSize());
+        
+        this.engine = new Engine("MicroTomcat", "localhost");
+        
+        Host defaultHost = new Host("localhost");
+        engine.addChild(defaultHost);
+        
+        try {
+            Context rootContext = new Context("", config.getWebRoot());
+            defaultHost.addChild(rootContext);
+            
+            Context app1Context = new Context("/app1", config.getWebRoot() + "/app1");
+            Context app2Context = new Context("/app2", config.getWebRoot() + "/app2");
+            defaultHost.addChild(app1Context);
+            defaultHost.addChild(app2Context);
+            
+            this.processorPool = new ProcessorPool(
+                100,
+                config.getWebRoot(),
+                engine
+            );
+            
+            this.connector = new Connector(config.getPort(), processorPool);
+            
+            engine.init();
+            processorPool.init();
+            connector.init();
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize server", e);
+        }
+    }
+
+    @Override
+    public void start() throws IOException {
+        try {
+            engine.start();
+            processorPool.start();
+            connector.start();
+            
+            for (int i = 0; i < config.getThreadPoolSize(); i++) {
+                executorService.submit(new ConnectionHandler());
+            }
+            
+            log("Server started on port " + config.getPort());
+            
+            synchronized (this) {
+                try {
+                    this.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        } catch (LifecycleException e) {
+            throw new IOException("Failed to start server", e);
+        }
+    }
+
+    private class ConnectionHandler implements Runnable {
+        @Override
+        public void run() {
+            while (running) {
+                Socket socket = connector.getSocket();
+                if (socket != null) {
+                    handleRequest(socket);
+                }
+            }
+        }
+    }
+
+    private void handleRequest(Socket socket) {
+        Processor processor = null;
+        try {
+            processor = processorPool.getProcessor(5000); // 5秒超时
+            if (processor != null) {
+                log(String.format("Acquired processor (active/total: %d/%d) for request from: %s",
+                    processorPool.getActiveCount(),
+                    processorPool.getTotalCount(),
+                    socket.getInetAddress()));
+                processor.process(socket);
+            } else {
+                log("No processor available, sending 503 response to: " + socket.getInetAddress());
+                try (OutputStream output = socket.getOutputStream()) {
+                    String response = "HTTP/1.1 503 Service Unavailable\r\n" +
+                            "Content-Type: text/plain\r\n" +
+                            "Content-Length: 35\r\n" +
+                            "\r\n" +
+                            "Server is too busy, please try later.";
+                    output.write(response.getBytes());
+                }
+            }
+        } catch (InterruptedException e) {
+            log("Processor acquisition interrupted for " + socket.getInetAddress() + ": " + e.getMessage());
+        } catch (IOException e) {
+            log("Error processing request from " + socket.getInetAddress() + ": " + e.getMessage());
+        } finally {
+            if (processor != null) {
+                processorPool.releaseProcessor(processor);
+                log("Released processor back to pool");
+            }
+            try {
+                socket.close();
+            } catch (IOException e) {
+                log("Error closing socket for " + socket.getInetAddress() + ": " + e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    protected void stop() {
+        running = false;
+        try {
+            connector.stop();
+            processorPool.stop();
+            engine.stop();
+            executorService.shutdown();
+        } catch (Exception e) {
+            log("Error while stopping server: " + e.getMessage());
+        }
+    }
+} 
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/server/NonBlockingHttpServer.java ===
+
+package com.microtomcat.server;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Set;
+
+public class NonBlockingHttpServer extends AbstractHttpServer {
+    private final Selector selector;
+    private final ServerSocketChannel serverChannel;
+
+    public NonBlockingHttpServer(ServerConfig config) throws IOException {
+        super(config);
+        this.selector = Selector.open();
+        this.serverChannel = ServerSocketChannel.open();
+        this.serverChannel.configureBlocking(false);
+        this.serverChannel.socket().bind(new InetSocketAddress(config.getPort()));
+        this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+    }
+
+    @Override
+    public void start() throws IOException {
+        log("Non-blocking server started on port: " + config.getPort());
+        
+        while (!Thread.currentThread().isInterrupted()) {
+            selector.select();
+            Set<SelectionKey> selectedKeys = selector.selectedKeys();
+            Iterator<SelectionKey> iter = selectedKeys.iterator();
+
+            while (iter.hasNext()) {
+                SelectionKey key = iter.next();
+                iter.remove();
+
+                if (key.isAcceptable()) {
+                    SocketChannel client = serverChannel.accept();
+                    client.configureBlocking(false);
+                    client.register(selector, SelectionKey.OP_READ);
+                    log("New connection accepted from: " + client.getRemoteAddress());
+                } else if (key.isReadable()) {
+                    handleRead(key);
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void stop() {
+        try {
+            selector.close();
+            serverChannel.close();
+        } catch (IOException e) {
+            log("Error while stopping server: " + e.getMessage());
+        }
+    }
+    
+    private void handleRead(SelectionKey key) throws IOException {
+        SocketChannel client = (SocketChannel) key.channel();
+        try {
+            // 创建缓冲区读取数据
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
+            int bytesRead = client.read(buffer);
+            
+            if (bytesRead == -1) {
+                // 客户端关闭连接
+                key.cancel();
+                client.close();
+                return;
+            }
+            
+            // 处理HTTP请求
+            buffer.flip();
+            byte[] data = new byte[buffer.remaining()];
+            buffer.get(data);
+            String request = new String(data);
+            
+            // 发送响应
+            String response = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: text/plain\r\n" +
+                            "Content-Length: 13\r\n" +
+                            "\r\n" +
+                            "Hello, World!";
+            
+            ByteBuffer responseBuffer = ByteBuffer.wrap(response.getBytes());
+            client.write(responseBuffer);
+            
+            // 关闭连接
+            key.cancel();
+            client.close();
+            
+        } catch (IOException e) {
+            log("Error processing request: " + e.getMessage());
+            key.cancel();
+            client.close();
+        }
+    }
+} 
