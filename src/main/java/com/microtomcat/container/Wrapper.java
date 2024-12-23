@@ -31,7 +31,8 @@ public class Wrapper extends ContainerBase {
         log("Initializing Wrapper: " + name);
         try {
             Context context = (Context) getParent();
-            Class<?> servletClass = context.getServletLoader().loadClass(this.servletClass);
+            Class<?> servletClass = context.getWebAppClassLoader()
+                                         .loadClass(this.servletClass);
             servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
             servlet.init();
         } catch (Exception e) {

@@ -4,149 +4,140 @@ import java.io.*;
 import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import com.microtomcat.servlet.HttpServlet;
+import com.microtomcat.servlet.Servlet;
+import com.microtomcat.servlet.ServletException;
 
 public class WebAppClassLoader extends MicroTomcatClassLoader {
     private final String webAppPath;
-    private final Map<String, Long> resourceModifiedTimes = new ConcurrentHashMap<>();
-    private final Map<String, Class<?>> loadedClasses = new ConcurrentHashMap<>();
-    
+    private final Map<String, Servlet> servletCache = new ConcurrentHashMap<>();
+
     public WebAppClassLoader(String webAppPath, ClassLoader parent) throws IOException {
         super(new URL[0], parent);
         this.webAppPath = webAppPath;
-        
-        // 添加 WEB-INF/classes 目录
+
+        // 1. 添加当前应用的类路径
         addRepository(webAppPath + "/WEB-INF/classes");
-        // 添加 WEB-INF/lib 目录中的所有 jar
-        addJars(new File(webAppPath + "/WEB-INF/lib"));
-        // 添加开发环境的类路径
-        addRepository("target/classes");
-        // 如果在 IDE 中运行，也添加编译输出目录
-        addRepository("build/classes");
-        
-        // 记录当前的类路径
+
+        // 2. 如果是根Context，添加其他必要的Web应用特定类路径(如 jar)
+        if (webAppPath.equals("webroot")) {
+            // addRepository("webroot/WEB-INF/lib");
+        }
+
         log("Class path repositories:");
         for (File path : repositoryPaths) {
             log(" - " + path.getAbsolutePath());
         }
     }
-    
-    private void addJars(File libDir) throws IOException {
-        if (libDir.exists() && libDir.isDirectory()) {
-            File[] jarFiles = libDir.listFiles((dir, name) -> name.endsWith(".jar"));
-            if (jarFiles != null) {
-                for (File jar : jarFiles) {
-                    addURL(jar.toURI().toURL());
-                }
-            }
-        }
-    }
-    
+
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         synchronized (getClassLoadingLock(name)) {
-            // 检查是否已加载
+            log("Attempting to load class: " + name);
+
+            // 1. 先检查是否已加载
             Class<?> c = findLoadedClass(name);
             if (c != null) {
+                log("Class already loaded: " + name + " by " + c.getClassLoader());
                 return c;
             }
 
-            // 对于 servlet 包下的类，必须委托给父加载器
+            // 如果是 com.microtomcat.servlet. 下的类，则一定交给父加载器
             if (name.startsWith("com.microtomcat.servlet.")) {
+                log("Delegating " + name + " to parent");
                 return getParent().loadClass(name);
             }
 
-            // 对于 example 包下的类，先加载父类，再自己加载
-            if (name.startsWith("com.microtomcat.example.")) {
-                try {
-                    // 先加载父类和接口
-                    Class<?> servletInterface = getParent().loadClass("com.microtomcat.servlet.Servlet");
-                    Class<?> httpServletClass = getParent().loadClass("com.microtomcat.servlet.HttpServlet");
-                    
-                    // 然后自己加载 example 包的类
-                    byte[] classData = loadClassData(name);
-                    if (classData == null) {
-                        throw new ClassNotFoundException("Could not load class data for: " + name);
-                    }
-                    
-                    // 定义类之前确保父类已加载
-                    resolveClass(httpServletClass);
-                    
-                    // 定义类
-                    c = defineClass(name, classData, 0, classData.length);
-                    
-                    // 验证类型关系
-                    if (!servletInterface.isAssignableFrom(c)) {
-                        throw new ClassNotFoundException("Loaded class " + name + " does not implement Servlet interface");
-                    }
-                    
-                    // 解析类
-                    resolveClass(c);
-                    
-                    log("Successfully loaded example class locally: " + name);
-                    return c;
-                } catch (Exception e) {
-                    log("Failed to load example class: " + name + ", error: " + e.getMessage());
-                    throw new ClassNotFoundException("Failed to load class: " + name, e);
-                }
-            }
-            
-            // 其他类走正常的双亲委派
-            try {
+            // ============ 额外加的关键逻辑: 如果是 HelloServlet，也只给父加载器 ============
+            if (name.equals("com.microtomcat.example.HelloServlet")) {
+                log("Delegating HelloServlet to parent");
                 return getParent().loadClass(name);
-            } catch (ClassNotFoundException e) {
-                return findClass(name);
             }
+
+            // 其余类按默认双亲委派(先 parent, 再自己)
+            return super.loadClass(name);
         }
     }
-    
-    private byte[] loadClassData(String name) {
-        String path = name.replace('.', '/') + ".class";
-        
-        // 尝试从各个仓库加载
-        for (File repo : repositoryPaths) {
-            File classFile = new File(repo, path);
-            if (classFile.exists()) {
-                try (FileInputStream fis = new FileInputStream(classFile);
-                     ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                    
-                    byte[] buffer = new byte[4096];
-                    int bytesRead;
-                    while ((bytesRead = fis.read(buffer)) != -1) {
-                        bos.write(buffer, 0, bytesRead);
-                    }
-                    return bos.toByteArray();
-                } catch (IOException e) {
-                    log("Error reading class file: " + classFile);
-                }
-            }
-        }
-        return null;
-    }
-    
-    private boolean needsReload(String className) {
-        String resourcePath = className.replace('.', '/') + ".class";
-        File classFile = new File(webAppPath + "/WEB-INF/classes/" + resourcePath);
-        
-        if (classFile.exists()) {
-            Long lastLoadTime = resourceModifiedTimes.get(className);
-            return lastLoadTime != null && classFile.lastModified() > lastLoadTime;
-        }
-        return false;
-    }
-    
-    private void recordLoadTime(String className) {
-        resourceModifiedTimes.put(className, System.currentTimeMillis());
-    }
-    
-    public void destroy() {
+
+    // 缓存已加载的Servlet实例
+    public Servlet loadServlet(String servletPath) throws ServletException {
         try {
-            // 清理资源
-            resourceModifiedTimes.clear();
-            loadedClasses.clear();
-            // 关闭类加载器
+            if (servletCache.containsKey(servletPath)) {
+                return servletCache.get(servletPath);
+            }
+
+            String servletName = servletPath.substring(servletPath.lastIndexOf("/") + 1);
+            Class<?> servletClass;
+
+            // 如果是根Context(""), 则可能要加载 com.microtomcat.example.HelloServlet
+            // 但我们已经在 loadClass() 里对 HelloServlet 做了「交给 parent」的逻辑
+            // 所以这里依然写: loadClass("com.microtomcat.example."+ servletName)
+            // 就能从 parent 拿到
+            if (webAppPath.equals("webroot")) {
+                servletClass = loadClass("com.microtomcat.example." + servletName);
+            } else {
+                // 对 /app1、/app2，直接用 "App1Servlet"/"App2Servlet" 这种类名
+                servletClass = loadClass(servletName);
+            }
+
+            if (!Servlet.class.isAssignableFrom(servletClass)) {
+                throw new ServletException("Class " + servletClass.getName() + " is not a Servlet");
+            }
+
+            Servlet servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
+            servlet.init();
+            servletCache.put(servletPath, servlet);
+            return servlet;
+
+        } catch (Exception e) {
+            throw new ServletException("Error loading servlet: " + servletPath, e);
+        }
+    }
+
+    public void destroy() {
+        servletCache.values().forEach(Servlet::destroy);
+        servletCache.clear();
+        try {
             close();
         } catch (IOException e) {
             log("Error destroying WebAppClassLoader: " + e.getMessage());
         }
     }
-} 
+
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        log("Finding class: " + name);
+
+        // 将类名转换为文件路径
+        String classFilePath = name.replace('.', '/') + ".class";
+        File classFile = new File(webAppPath + "/WEB-INF/classes", classFilePath);
+        log("Looking for application servlet class: " + classFile.getAbsolutePath());
+        byte[] classData = loadClassData(classFile);
+
+        if (classData == null) {
+            throw new ClassNotFoundException("Could not find class: " + name);
+        }
+
+        return defineClass(name, classData, 0, classData.length);
+    }
+
+    private byte[] loadClassData(File classFile) {
+        if (!classFile.exists()) {
+            return null;
+        }
+
+        try (FileInputStream fis = new FileInputStream(classFile);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                bos.write(buffer, 0, bytesRead);
+            }
+            log("Found class file: " + classFile.getAbsolutePath());
+            return bos.toByteArray();
+        } catch (IOException e) {
+            log("Error reading class file: " + classFile + ", error: " + e.getMessage());
+            return null;
+        }
+    }
+}

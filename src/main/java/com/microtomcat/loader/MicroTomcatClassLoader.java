@@ -35,14 +35,14 @@ public abstract class MicroTomcatClassLoader extends URLClassLoader {
         synchronized (getClassLoadingLock(name)) {
             log("Attempting to load class: " + name);
             
-            // 首先检查是否已经加载
+            // 1. 如果已经加载过，直接返回
             Class<?> c = findLoadedClass(name);
             if (c != null) {
                 log("Class already loaded: " + name);
                 return c;
             }
             
-            // 实现双亲委派模型
+            // 2. 双亲委派
             try {
                 c = getParent().loadClass(name);
                 log("Class loaded by parent: " + name);
@@ -52,7 +52,7 @@ public abstract class MicroTomcatClassLoader extends URLClassLoader {
                 log("Parent couldn't load class: " + name + ", trying locally");
             }
             
-            // 尝试从本地仓库加载
+            // 3. 从本地仓库加载
             try {
                 c = findClass(name);
                 log("Successfully loaded class locally: " + name);
@@ -63,4 +63,4 @@ public abstract class MicroTomcatClassLoader extends URLClassLoader {
             }
         }
     }
-} 
+}

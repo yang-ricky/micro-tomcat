@@ -14,6 +14,8 @@ import java.util.concurrent.Executors;
 import com.microtomcat.server.ServerConfig;
 import com.microtomcat.server.AbstractHttpServer;
 import com.microtomcat.server.HttpServerFactory;
+import com.microtomcat.loader.ClassLoaderManager;
+import com.microtomcat.lifecycle.LifecycleException;
 
 public class HttpServer {
     private static final int DEFAULT_PORT = 8080;
@@ -31,26 +33,31 @@ public class HttpServer {
         System.out.printf("[%s] %s%n", timestamp, message);
     }
 
-    public void start() {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            log("Server started on port: " + port);
+    public void start() throws LifecycleException {
+        try {
+            // 初始化类加载器
+            ClassLoaderManager.init();
             
-            while (true) {
-                Socket socket = serverSocket.accept();
-                log("New connection accepted from: " + socket.getInetAddress());
-                executorService.submit(() -> {
-                    try {
-                        handleRequest(socket);
-                    } catch (IOException e) {
-                        log("Error handling request: " + e.getMessage());
-                    } finally {
+            try (ServerSocket serverSocket = new ServerSocket(port)) {
+                log("Server started on port: " + port);
+                
+                while (true) {
+                    Socket socket = serverSocket.accept();
+                    log("New connection accepted from: " + socket.getInetAddress());
+                    executorService.submit(() -> {
                         try {
-                            socket.close();
+                            handleRequest(socket);
                         } catch (IOException e) {
-                            log("Error closing socket: " + e.getMessage());
+                            log("Error handling request: " + e.getMessage());
+                        } finally {
+                            try {
+                                socket.close();
+                            } catch (IOException e) {
+                                log("Error closing socket: " + e.getMessage());
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
         } catch (IOException e) {
             log("Server error: " + e.getMessage());
