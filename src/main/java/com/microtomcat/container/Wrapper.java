@@ -35,12 +35,13 @@ public class Wrapper extends ContainerBase {
             // 1. 如果是框架提供的 Servlet (com.microtomcat.example.*)，用系统类加载器
             if (this.servletClass.startsWith("com.microtomcat.")) {
                 ClassLoader loader = getParent().getClass().getClassLoader();
+                log("For servlet in target/classes, loading servlet class: " + this.servletClass + " using loader: " + loader);
                 servletClass = loader.loadClass(this.servletClass);
             } 
             // 2. 如果是应用的 Servlet，用对应的 WebAppClassLoader
             else {
                 ClassLoader loader = context.getWebAppClassLoader();
-                log("Loading servlet class: " + this.servletClass + " using loader: " + loader);
+                log("For servlet in webroot, loading servlet class: " + this.servletClass + " using loader: " + loader);
                 servletClass = loader.loadClass(this.servletClass);
             }
 

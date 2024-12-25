@@ -36,7 +36,7 @@ public class ClassLoaderManager {
         initialized = true;
         
         // 5. 在初始化完成后分析类加载器情况
-        analyzeClassLoaders();
+        //analyzeClassLoaders();
     }
 
     // 添加类加载器分析方法

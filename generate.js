@@ -7,14 +7,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 指定要搜索的类名
-const className = ["CatalinaClassLoader"
-    ,"MicroTomcatClassLoader",
+const className = [
+    "CatalinaClassLoader",
+    "MicroTomcatClassLoader",
     "ClassLoaderManager", 
     "CommonClassLoader",
-     "SharedClassLoader",
-      "WebAppClassLoader",
-    "BlockingHttpServer"
-    ];
+    "SharedClassLoader",
+    "WebAppClassLoader",
+    "BlockingHttpServer",
+    "Context",
+    "ContainerBase",
+    "Wrapper",
+    "HttpServlet",
+    "Servlet"
+]
 
 // 定义要搜索的根目录
 const rootDir = path.resolve(__dirname);
