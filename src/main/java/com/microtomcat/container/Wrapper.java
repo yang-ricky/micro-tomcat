@@ -79,15 +79,15 @@ public class Wrapper extends ContainerBase {
     @Override
     protected void startInternal() throws LifecycleException {
         log("Starting Wrapper: " + name);
-        try {
-            if (servlet == null && servletClass != null) {
-                Class<?> clazz = Class.forName(servletClass);
-                servlet = (Servlet) clazz.getDeclaredConstructor().newInstance();
-                servlet.init();
-            }
-        } catch (Exception e) {
-            throw new LifecycleException("Failed to initialize servlet", e);
-        }
+        // try {
+        //     if (servlet == null && servletClass != null) {
+        //         Class<?> clazz = Class.forName(servletClass);
+        //         servlet = (Servlet) clazz.getDeclaredConstructor().newInstance();
+        //         servlet.init();
+        //     }
+        // } catch (Exception e) {
+        //     throw new LifecycleException("Failed to initialize servlet", e);
+        // }
     }
 
     @Override

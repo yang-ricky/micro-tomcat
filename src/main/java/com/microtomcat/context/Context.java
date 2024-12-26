@@ -3,6 +3,7 @@ package com.microtomcat.context;
 import com.microtomcat.container.Container;
 import com.microtomcat.container.ContainerBase;
 import com.microtomcat.container.Wrapper;
+import com.microtomcat.example.SessionTestServlet;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
@@ -34,25 +35,22 @@ public class Context extends ContainerBase {
                 // 注册 HelloServlet
                 log("Registering HelloServlet...");
                 Wrapper helloWrapper = new Wrapper("HelloServlet", "com.microtomcat.example.HelloServlet");
+                Wrapper sessionTestWrapper = new Wrapper("SessionTestServlet", "com.microtomcat.example.SessionTestServlet");
                 addChild(helloWrapper);
+                addChild(sessionTestWrapper);
+                Wrapper webRootWrapper = new Wrapper("WebRootServlet", "WebRootServlet");
+                addChild(webRootWrapper);
             } else if (name.equals("/app1")) {  // app1 上下文
                 // 注册 App1Servlet
                 log("Registering App1Servlet...");
                 Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
                 addChild(app1Wrapper);
-            } 
-
-            // else if (name.equals("/app1")) {  // app1 上下文
-            //     // 注册 App1Servlet
-            //     log("Registering App1Servlet...");
-            //     Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
-            //     addChild(app1Wrapper);
-            // } else if (name.equals("/app2")) {  // app2 上下文
-            //     // 注册 App2Servlet
-            //     log("Registering App2Servlet...");
-            //     Wrapper app2Wrapper = new Wrapper("App2Servlet", "App2Servlet");
-            //     addChild(app2Wrapper);
-            // }
+            } else if (name.equals("/app2")) {  // app2 上下文
+                // 注册 App2Servlet
+                log("Registering App2Servlet...");
+                Wrapper app2Wrapper = new Wrapper("App2Servlet", "App2Servlet");
+                addChild(app2Wrapper);
+            }
 
             log("Successfully registered servlets for context: " + name);
         } catch (Exception e) {
@@ -88,6 +86,7 @@ public class Context extends ContainerBase {
                     // 动态创建Wrapper，使用简单的类名
                     wrapper = new Wrapper(servletName, servletName.substring(servletName.lastIndexOf('.') + 1));
                     addChild(wrapper);
+                    wrapper.init();
                     wrapper.start();
                 }
                 wrapper.invoke(request, response);
