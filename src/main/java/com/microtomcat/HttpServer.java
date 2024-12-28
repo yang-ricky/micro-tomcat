@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.microtomcat.server.ServerConfig;
 import com.microtomcat.server.AbstractHttpServer;
@@ -17,22 +18,25 @@ import com.microtomcat.server.HttpServerFactory;
 import com.microtomcat.loader.ClassLoaderManager;
 import com.microtomcat.lifecycle.LifecycleException;
 
-public class HttpServer {
+public class HttpServer extends AbstractHttpServer {
     private static final int DEFAULT_PORT = 8080;
     private final int port;
     private static final String WEB_ROOT = "webroot";
     private final ExecutorService executorService;
 
-    public HttpServer(int port) {
+    public HttpServer(int port) throws IOException {
+        super(new ServerConfig(port, false, 10, WEB_ROOT));
         this.port = port;
         this.executorService = Executors.newFixedThreadPool(10);
     }
 
-    private void log(String message) {
+    @Override
+    protected void log(String message) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME);
         System.out.printf("[%s] %s%n", timestamp, message);
     }
 
+    @Override
     public void start() throws LifecycleException {
         try {
             // 初始化类加载器
@@ -40,15 +44,14 @@ public class HttpServer {
             
             try (ServerSocket serverSocket = new ServerSocket(port)) {
                 log("Server started on port: " + port);
-                
-                while (true) {
+                while (!Thread.currentThread().isInterrupted()) {
                     Socket socket = serverSocket.accept();
                     log("New connection accepted from: " + socket.getInetAddress());
-                    executorService.submit(() -> {
+                    executorService.execute(() -> {
                         try {
                             handleRequest(socket);
-                        } catch (IOException e) {
-                            log("Error handling request: " + e.getMessage());
+                        } catch (Exception e) {
+                            log("Error processing request: " + e.getMessage());
                         } finally {
                             try {
                                 socket.close();
@@ -59,11 +62,8 @@ public class HttpServer {
                     });
                 }
             }
-        } catch (IOException e) {
-            log("Server error: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            executorService.shutdown();
+        } catch (Exception e) {
+            throw new LifecycleException("Failed to start server", e);
         }
     }
 
@@ -131,9 +131,18 @@ public class HttpServer {
         return "application/octet-stream";
     }
 
+    @Override
+    protected void initInternal() throws LifecycleException {
+        super.initInternal();
+    }
+    
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        super.destroyInternal();
+    }
+
     public static void main(String[] args) {
         try {
-            // 创建服务器配置
             ServerConfig config = new ServerConfig(
                 DEFAULT_PORT,    // 端口
                 false,          // 使用阻塞式 IO
@@ -141,14 +150,30 @@ public class HttpServer {
                 WEB_ROOT       // Web根目录
             );
             
-            // 通过工厂创建服务器实例
             AbstractHttpServer server = HttpServerFactory.createServer(config);
-            
-            // 启动服务器
+            server.init();
             server.start();
-        } catch (IOException e) {
+        } catch (IOException | LifecycleException e) {
             System.err.println("Server startup failed: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void stop() throws LifecycleException {
+        // 关闭线程池
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+                throw new LifecycleException("Error while stopping server", e);
+            }
+        }
+        log("Server stopped");
     }
 }

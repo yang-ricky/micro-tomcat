@@ -8,18 +8,11 @@ const __dirname = path.dirname(__filename);
 
 // 指定要搜索的类名
 const className = [
-    "CatalinaClassLoader",
-    "MicroTomcatClassLoader",
-    "ClassLoaderManager", 
-    "CommonClassLoader",
-    "SharedClassLoader",
-    "WebAppClassLoader",
-    "BlockingHttpServer",
-    "Context",
-    "ContainerBase",
-    "Wrapper",
-    "HttpServlet",
-    "Servlet"
+    "HttpServer",
+    "Connector",
+    "ConnectorMBean",
+    "ProcessorPool",
+    "ProcessorPoolMBean",
 ]
 
 // 定义要搜索的根目录

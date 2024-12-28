@@ -10,6 +10,8 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.microtomcat.lifecycle.LifecycleException;
+
 public class NonBlockingHttpServer extends AbstractHttpServer {
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
@@ -24,32 +26,36 @@ public class NonBlockingHttpServer extends AbstractHttpServer {
     }
 
     @Override
-    public void start() throws IOException {
-        log("Non-blocking server started on port: " + config.getPort());
-        
-        while (!Thread.currentThread().isInterrupted()) {
-            selector.select();
-            Set<SelectionKey> selectedKeys = selector.selectedKeys();
-            Iterator<SelectionKey> iter = selectedKeys.iterator();
+    public void start() throws LifecycleException {
+        try {
+            log("Non-blocking server started on port: " + config.getPort());
+            
+            while (!Thread.currentThread().isInterrupted()) {
+                selector.select();
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                Iterator<SelectionKey> iter = selectedKeys.iterator();
 
-            while (iter.hasNext()) {
-                SelectionKey key = iter.next();
-                iter.remove();
+                while (iter.hasNext()) {
+                    SelectionKey key = iter.next();
+                    iter.remove();
 
-                if (key.isAcceptable()) {
-                    SocketChannel client = serverChannel.accept();
-                    client.configureBlocking(false);
-                    client.register(selector, SelectionKey.OP_READ);
-                    log("New connection accepted from: " + client.getRemoteAddress());
-                } else if (key.isReadable()) {
-                    handleRead(key);
+                    if (key.isAcceptable()) {
+                        SocketChannel client = serverChannel.accept();
+                        client.configureBlocking(false);
+                        client.register(selector, SelectionKey.OP_READ);
+                        log("New connection accepted from: " + client.getRemoteAddress());
+                    } else if (key.isReadable()) {
+                        handleRead(key);
+                    }
                 }
             }
+        } catch (IOException e) {
+            throw new LifecycleException("Error starting server: " + e.getMessage(), e);
         }
     }
 
     @Override
-    protected void stop() {
+    public void stop() {
         try {
             selector.close();
             serverChannel.close();

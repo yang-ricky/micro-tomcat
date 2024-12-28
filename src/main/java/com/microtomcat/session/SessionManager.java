@@ -47,4 +47,8 @@ public class SessionManager {
     public void shutdown() {
         scheduler.shutdown();
     }
+
+    public void invalidateAll() {
+        sessions.clear();
+    }
 } 

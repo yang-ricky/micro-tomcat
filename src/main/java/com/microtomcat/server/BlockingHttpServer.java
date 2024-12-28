@@ -9,6 +9,9 @@ import com.microtomcat.context.Context;
 import com.microtomcat.container.Engine;
 import com.microtomcat.container.Host;
 import com.microtomcat.lifecycle.LifecycleException;
+import com.microtomcat.jmx.MBeanRegistry;
+import com.microtomcat.jmx.StandardServer;
+import javax.management.JMException;
 
 import java.io.*;
 import java.net.Socket;
@@ -21,6 +24,8 @@ public class BlockingHttpServer extends AbstractHttpServer {
     private final Connector connector;
     private final Engine engine;
     private volatile boolean running = true;
+    private MBeanRegistry mbeanRegistry;
+    private StandardServer serverMBean;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
@@ -58,7 +63,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
     }
 
     @Override
-    public void start() throws IOException {
+    public void start() {
         try {
             engine.start();
             processorPool.start();
@@ -77,8 +82,8 @@ public class BlockingHttpServer extends AbstractHttpServer {
                     Thread.currentThread().interrupt();
                 }
             }
-        } catch (LifecycleException e) {
-            throw new IOException("Failed to start server", e);
+        } catch (LifecycleException  e) {
+            throw new RuntimeException("Failed to start server", e);
         }
     }
 
@@ -133,7 +138,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
     }
 
     @Override
-    protected void stop() {
+    public void stop() {
         running = false;
         try {
             connector.stop();
@@ -142,6 +147,30 @@ public class BlockingHttpServer extends AbstractHttpServer {
             executorService.shutdown();
         } catch (Exception e) {
             log("Error while stopping server: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void initInternal() throws LifecycleException {
+        super.initInternal();
+        
+        try {
+            System.out.println("Initializing JMX support...");
+            mbeanRegistry = new MBeanRegistry();
+            
+            System.out.println("Registering Server MBean...");
+            serverMBean = new StandardServer(processorPool, engine);
+            mbeanRegistry.registerMBean(serverMBean, "StandardServer");
+            
+            System.out.println("Registering ProcessorPool MBean...");
+            mbeanRegistry.registerMBean(processorPool, "ProcessorPool");
+            
+            System.out.println("Registering Connector MBean...");
+            mbeanRegistry.registerMBean(connector, "Connector");
+            
+            System.out.println("JMX initialization completed.");
+        } catch (JMException e) {
+            throw new LifecycleException("Failed to initialize JMX support", e);
         }
     }
 } 
