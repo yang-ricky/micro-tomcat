@@ -4,12 +4,16 @@ import com.microtomcat.container.Container;
 import com.microtomcat.container.ContainerBase;
 import com.microtomcat.container.Wrapper;
 import com.microtomcat.example.SessionTestServlet;
+import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.loader.WebAppClassLoader;
 import com.microtomcat.loader.ClassLoaderManager;
+import com.microtomcat.session.distributed.DistributedSessionManager;
+import com.microtomcat.session.distributed.InMemoryReplicatedSessionStore;
+import com.microtomcat.session.distributed.SessionStoreAdapter;
 import java.io.File;
 import java.io.IOException;
 
@@ -21,7 +25,11 @@ public class Context extends ContainerBase {
     public Context(String name, String docBase) throws IOException {
         this.name = name;
         this.docBase = docBase;
-        this.sessionManager = new SessionManager();
+        
+        // 创建分布式会话管理器
+        ClusterRegistry clusterRegistry = ClusterRegistry.getInstance();
+        SessionStoreAdapter sessionStore = new InMemoryReplicatedSessionStore(clusterRegistry);
+        this.sessionManager = new DistributedSessionManager(sessionStore);
         
         this.webAppClassLoader = ClassLoaderManager.createWebAppClassLoader(docBase);
         

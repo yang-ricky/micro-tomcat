@@ -17,6 +17,10 @@ public class Engine extends ContainerBase {
         return defaultHost;
     }
 
+    public Host getDefaultHostContainer() {
+        return (Host) findChild(defaultHost);
+    }
+
     public void setDefaultHost(String defaultHost) {
         this.defaultHost = defaultHost;
     }

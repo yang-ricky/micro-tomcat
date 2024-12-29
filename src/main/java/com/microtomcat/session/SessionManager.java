@@ -36,11 +36,11 @@ public class SessionManager {
         sessions.remove(sessionId);
     }
 
-    private String generateSessionId() {
+    protected String generateSessionId() {
         return UUID.randomUUID().toString().replace("-", "");
     }
 
-    private void cleanExpiredSessions() {
+    protected void cleanExpiredSessions() {
         sessions.entrySet().removeIf(entry -> !entry.getValue().isValid());
     }
 

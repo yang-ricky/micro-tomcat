@@ -43,11 +43,24 @@ public class Response {
     }
 
     public void sendError(int statusCode, String message) throws IOException {
-        output.write(("HTTP/1.1 " + statusCode + " " + message + "\r\n").getBytes());
-        output.write("Content-Type: text/plain\r\n".getBytes());
-        output.write(("Content-Length: " + message.length() + "\r\n").getBytes());
-        output.write("\r\n".getBytes());
-        output.write(message.getBytes());
+        StringBuilder response = new StringBuilder();
+        response.append("HTTP/1.1 ").append(statusCode).append(" ");
+        
+        switch (statusCode) {
+            case 200: response.append("OK"); break;
+            case 400: response.append("Bad Request"); break;
+            case 404: response.append("Not Found"); break;
+            case 500: response.append("Internal Server Error"); break;
+            default: response.append("Unknown Status");
+        }
+        
+        response.append("\r\n");
+        response.append("Content-Type: text/plain\r\n");
+        response.append("Content-Length: ").append(message.length()).append("\r\n");
+        response.append("\r\n");
+        response.append(message);
+        
+        output.write(response.toString().getBytes());
         output.flush();
     }
 

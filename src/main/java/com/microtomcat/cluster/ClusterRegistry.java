@@ -8,6 +8,7 @@ import java.util.ArrayList;
 public class ClusterRegistry {
     private final Map<String, ClusterNode> nodes = new ConcurrentHashMap<>();
     private static final ClusterRegistry instance = new ClusterRegistry();
+    private ClusterNode currentNode;
 
     private ClusterRegistry() {}
 
@@ -55,5 +56,13 @@ public class ClusterRegistry {
 
     private void log(String message) {
         System.out.println("[ClusterRegistry] " + message);
+    }
+
+    public void setCurrentNode(ClusterNode node) {
+        this.currentNode = node;
+    }
+
+    public ClusterNode getCurrentNode() {
+        return currentNode;
     }
 } 

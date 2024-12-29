@@ -17,7 +17,15 @@ const className = [
     "HeartbeatService",
     "DefaultHeartbeatService",
     "NodeStatusManager",
-    "ClusterRegistry"
+    "ClusterRegistry",
+    "SessionManager",
+    "Processor",
+    "Session",
+    "Host",
+    "Request",
+    "Response",
+    "SessionStoreAdapter",
+    "SessionStore",
 ]
 
 // 定义要搜索的根目录

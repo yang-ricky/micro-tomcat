@@ -53,4 +53,16 @@ public class Session {
     public Instant getLastAccessedTime() {
         return lastAccessedTime;
     }
+
+    public int getMaxInactiveInterval() {
+        return maxInactiveInterval;
+    }
+
+    public Map<String, Object> getAttributes() {
+        return attributes;
+    }
+
+    public void setLastAccessedTime(Instant lastAccessedTime) {
+        this.lastAccessedTime = lastAccessedTime;
+    }
 } 

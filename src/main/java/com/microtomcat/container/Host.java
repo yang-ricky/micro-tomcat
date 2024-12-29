@@ -77,4 +77,8 @@ public class Host extends ContainerBase {
     protected void destroyInternal() throws LifecycleException {
         log("Destroying Host: " + name);
     }
+
+    public Context getDefaultContext() {
+        return (Context) findChild("");
+    }
 } 

@@ -22,16 +22,17 @@ public class Request {
     private final Map<String, String> headers = new HashMap<>();
     private Context context;
     private String serverName;
+    private final StringBuilder requestContent = new StringBuilder();
+    private BufferedReader reader;
+    private String body;
 
     public Request(InputStream input, SessionManager sessionManager) {
         this.input = input;
         this.sessionManager = sessionManager;
+        this.reader = new BufferedReader(new InputStreamReader(input));
     }
 
     public void parse() throws IOException {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-        
-        // 解析请求行
         String requestLine = reader.readLine();
         if (requestLine != null) {
             String[] parts = requestLine.split(" ");
@@ -42,7 +43,6 @@ public class Request {
             }
         }
         
-        // 解析请求头
         String headerLine;
         while ((headerLine = reader.readLine()) != null && !headerLine.isEmpty()) {
             int colonPos = headerLine.indexOf(':');
@@ -50,6 +50,18 @@ public class Request {
                 String headerName = headerLine.substring(0, colonPos).trim();
                 String headerValue = headerLine.substring(colonPos + 1).trim();
                 headers.put(headerName, headerValue);
+            }
+        }
+
+        if ("POST".equalsIgnoreCase(method)) {
+            String contentLengthStr = headers.get("Content-Length");
+            if (contentLengthStr != null) {
+                int contentLength = Integer.parseInt(contentLengthStr);
+                char[] bodyChars = new char[contentLength];
+                int readCount = reader.read(bodyChars);
+                if (readCount > 0) {
+                    this.body = new String(bodyChars, 0, readCount);
+                }
             }
         }
     }
@@ -93,7 +105,6 @@ public class Request {
 
     private String getCookieValue(String name) {
         try {
-            // 从请求头中查找 Cookie
             String cookieHeader = headers.get("Cookie");
             if (cookieHeader != null) {
                 String[] cookies = cookieHeader.split(";");
@@ -124,7 +135,6 @@ public class Request {
 
     public String getServerName() {
         if (serverName == null) {
-            // 从Host头中获取
             serverName = getHeader("Host");
             if (serverName != null) {
                 int colonPos = serverName.indexOf(':');
@@ -134,5 +144,13 @@ public class Request {
             }
         }
         return serverName;
+    }
+
+    public BufferedReader getReader() {
+        return reader;
+    }
+
+    public String getBody() {
+        return body;
     }
 }
