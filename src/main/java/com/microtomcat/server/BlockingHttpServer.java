@@ -23,6 +23,10 @@ import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.cluster.NodeStatus;
 import com.microtomcat.cluster.config.ClusterConfig;
 import com.microtomcat.cluster.config.ClusterConfigLoader;
+import com.microtomcat.cluster.NodeStatusManager;
+import com.microtomcat.cluster.LoggingNodeStatusListener;
+import com.microtomcat.cluster.heartbeat.HeartbeatService;
+import com.microtomcat.cluster.heartbeat.DefaultHeartbeatService;
 
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
@@ -191,10 +195,18 @@ public class BlockingHttpServer extends AbstractHttpServer {
             ClusterConfigLoader loader = new ClusterConfigLoader();
             clusterConfig = loader.loadConfig();
             
-            // 2. 获取集群注册表实例
+            // 2. 创建状态管理器和心跳服务
+            NodeStatusManager nodeStatusManager = new NodeStatusManager();
+            nodeStatusManager.addStatusListener("logging", new LoggingNodeStatusListener());
+            
+            HeartbeatService heartbeatService = new DefaultHeartbeatService(nodeStatusManager);
+            heartbeatService.setHeartbeatInterval(clusterConfig.getHeartbeatInterval());
+            heartbeatService.setHeartbeatTimeout(clusterConfig.getHeartbeatTimeout());
+            
+            // 3. 获取集群注册表实例
             clusterRegistry = ClusterRegistry.getInstance();
             
-            // 3. 注册配置的节点
+            // 4. 注册配置的节点
             for (ClusterConfig.NodeConfig nodeConfig : clusterConfig.getNodes()) {
                 ClusterNode node = new ClusterNode(
                     nodeConfig.getName(),
@@ -208,7 +220,11 @@ public class BlockingHttpServer extends AbstractHttpServer {
                 }
                 
                 clusterRegistry.registerNode(node);
+                nodeStatusManager.addNode(node);
             }
+            
+            // 5. 启动心跳服务
+            heartbeatService.start();
             
             log("Cluster initialized with " + clusterConfig.getNodes().size() + " nodes");
             

@@ -27,29 +27,7 @@ public class ClusterConfigLoader {
             Document doc = builder.parse(configFile);
             doc.getDocumentElement().normalize();
 
-            ClusterConfig config = new ClusterConfig();
-            
-            // 解析基本配置
-            Element root = doc.getDocumentElement();
-            config.setClusterName(root.getAttribute("name"));
-            config.setHeartbeatInterval(Integer.parseInt(
-                root.getAttribute("heartbeatInterval")));
-            config.setHeartbeatTimeout(Integer.parseInt(
-                root.getAttribute("heartbeatTimeout")));
-
-            // 解析节点配置
-            NodeList nodeList = doc.getElementsByTagName("node");
-            for (int i = 0; i < nodeList.getLength(); i++) {
-                Element nodeElement = (Element) nodeList.item(i);
-                ClusterConfig.NodeConfig nodeConfig = new ClusterConfig.NodeConfig();
-                nodeConfig.setName(nodeElement.getAttribute("name"));
-                nodeConfig.setHost(nodeElement.getAttribute("host"));
-                nodeConfig.setPort(Integer.parseInt(nodeElement.getAttribute("port")));
-                config.getNodes().add(nodeConfig);
-            }
-
-            log("Successfully loaded cluster configuration");
-            return config;
+            return parseDocument(doc);
 
         } catch (Exception e) {
             log("Error loading cluster configuration: " + e.getMessage());
@@ -68,6 +46,40 @@ public class ClusterConfigLoader {
         config.getNodes().add(defaultNode);
         
         log("Created default cluster configuration");
+        return config;
+    }
+
+    private ClusterConfig parseDocument(Document doc) {
+        ClusterConfig config = new ClusterConfig();
+        
+        // 解析基本配置
+        Element root = doc.getDocumentElement();
+        config.setClusterName(root.getAttribute("name"));
+        
+        // 解析心跳配置
+        NodeList heartbeatIntervalNodes = root.getElementsByTagName("heartbeatInterval");
+        if (heartbeatIntervalNodes.getLength() > 0) {
+            config.setHeartbeatInterval(Long.parseLong(
+                heartbeatIntervalNodes.item(0).getTextContent()));
+        }
+        
+        NodeList heartbeatTimeoutNodes = root.getElementsByTagName("heartbeatTimeout");
+        if (heartbeatTimeoutNodes.getLength() > 0) {
+            config.setHeartbeatTimeout(Long.parseLong(
+                heartbeatTimeoutNodes.item(0).getTextContent()));
+        }
+
+        // 解析节点配置
+        NodeList nodeList = root.getElementsByTagName("node");
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            Element nodeElement = (Element) nodeList.item(i);
+            ClusterConfig.NodeConfig nodeConfig = new ClusterConfig.NodeConfig();
+            nodeConfig.setName(nodeElement.getAttribute("name"));
+            nodeConfig.setHost(nodeElement.getAttribute("host"));
+            nodeConfig.setPort(Integer.parseInt(nodeElement.getAttribute("port")));
+            config.getNodes().add(nodeConfig);
+        }
+
         return config;
     }
 

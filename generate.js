@@ -14,6 +14,10 @@ const className = [
     "Context",
     "WebAppClassLoader",
     "Processor",
+    "HeartbeatService",
+    "DefaultHeartbeatService",
+    "NodeStatusManager",
+    "ClusterRegistry"
 ]
 
 // 定义要搜索的根目录

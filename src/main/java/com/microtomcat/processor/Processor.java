@@ -67,7 +67,13 @@ public class Processor extends LifecycleBase {
             
             request.parse();
             
-            // 直接使用Engine处理请求
+            // 处理 /ping 请求
+            if ("/ping".equals(request.getUri())) {
+                response.sendError(200, "OK");
+                return;
+            }
+            
+            // 继续原有的处理逻辑
             engine.invoke(request, response);
             
         } catch (Exception e) {

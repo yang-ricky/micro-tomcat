@@ -197,6 +197,119 @@ public class HttpServer extends AbstractHttpServer {
 }
 
 
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/cluster/ClusterRegistry.java ===
+
+package com.microtomcat.cluster;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.ArrayList;
+
+public class ClusterRegistry {
+    private final Map<String, ClusterNode> nodes = new ConcurrentHashMap<>();
+    private static final ClusterRegistry instance = new ClusterRegistry();
+
+    private ClusterRegistry() {}
+
+    public static ClusterRegistry getInstance() {
+        return instance;
+    }
+
+    public void registerNode(ClusterNode node) {
+        if (validateNode(node)) {
+            nodes.put(node.getId(), node);
+            log("Node registered: " + node);
+        }
+    }
+
+    public void unregisterNode(String nodeId) {
+        ClusterNode node = nodes.remove(nodeId);
+        if (node != null) {
+            log("Node unregistered: " + node);
+        }
+    }
+
+    public List<ClusterNode> getAllNodes() {
+        return new ArrayList<>(nodes.values());
+    }
+
+    public ClusterNode getNode(String nodeId) {
+        return nodes.get(nodeId);
+    }
+
+    private boolean validateNode(ClusterNode node) {
+        if (node.getName() == null || node.getName().trim().isEmpty()) {
+            log("Invalid node name");
+            return false;
+        }
+        if (node.getHost() == null || node.getHost().trim().isEmpty()) {
+            log("Invalid host");
+            return false;
+        }
+        if (node.getPort() <= 0 || node.getPort() > 65535) {
+            log("Invalid port number");
+            return false;
+        }
+        return true;
+    }
+
+    private void log(String message) {
+        System.out.println("[ClusterRegistry] " + message);
+    }
+} 
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/cluster/NodeStatusManager.java ===
+
+package com.microtomcat.cluster;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class NodeStatusManager {
+    private final Map<String, ClusterNode> nodes = new ConcurrentHashMap<>();
+    private final Map<String, NodeStatusListener> listeners = new ConcurrentHashMap<>();
+
+    public void updateNodeStatus(ClusterNode node, NodeStatus newStatus) {
+        NodeStatus oldStatus = node.getStatus();
+        if (oldStatus != newStatus) {
+            node.setStatus(newStatus);
+            notifyStatusChange(node, oldStatus, newStatus);
+        }
+    }
+
+    public void addStatusListener(String listenerId, NodeStatusListener listener) {
+        listeners.put(listenerId, listener);
+    }
+
+    public void removeStatusListener(String listenerId) {
+        listeners.remove(listenerId);
+    }
+
+    private void notifyStatusChange(ClusterNode node, NodeStatus oldStatus, NodeStatus newStatus) {
+        for (NodeStatusListener listener : listeners.values()) {
+            if (oldStatus == NodeStatus.RUNNING && newStatus == NodeStatus.UNREACHABLE) {
+                listener.onNodeDown(node);
+            } else if (oldStatus == NodeStatus.UNREACHABLE && newStatus == NodeStatus.RUNNING) {
+                listener.onNodeUp(node);
+            }
+        }
+    }
+
+    public Collection<ClusterNode> getAllNodes() {
+        return nodes.values();
+    }
+
+    public void addNode(ClusterNode node) {
+        nodes.put(node.getId(), node);
+    }
+
+    public void removeNode(String nodeId) {
+        nodes.remove(nodeId);
+    }
+} 
+
 === /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/cluster/heartbeat/DefaultHeartbeatService.java ===
 
 package com.microtomcat.cluster.heartbeat;
@@ -277,6 +390,20 @@ public class DefaultHeartbeatService implements HeartbeatService {
     public void setHeartbeatTimeout(long timeout) {
         this.heartbeatTimeout = timeout;
     }
+} 
+
+=== /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/cluster/heartbeat/HeartbeatService.java ===
+
+package com.microtomcat.cluster.heartbeat;
+
+import com.microtomcat.cluster.ClusterNode;
+
+public interface HeartbeatService {
+    void start();
+    void stop();
+    void checkNode(ClusterNode node);
+    void setHeartbeatInterval(long interval);
+    void setHeartbeatTimeout(long timeout);
 } 
 
 === /Users/yang/code/study/micro-tomcat/src/main/java/com/microtomcat/container/Wrapper.java ===
@@ -899,35 +1026,12 @@ public class Processor extends LifecycleBase {
             Response response = new Response(socket.getOutputStream(), request);
             
             request.parse();
-            String uri = request.getUri();
             
-            // 处理根路径请求
-            if (uri == null || uri.equals("/")) {
-                uri = "/index.html";
-                request.setUri(uri);
-            }
-            
-            // 处理心跳检测请求
-            if ("/ping".equals(uri)) {
-                response.setStatus(200);
-                response.setHeader("Content-Type", "text/plain");
-                response.setHeader("Content-Length", "2");
-                response.sendHeaders();
-                response.getWriter().write("OK");
-                return;
-            }
-            
-            // 使用Engine处理请求
+            // 直接使用Engine处理请求
             engine.invoke(request, response);
             
         } catch (Exception e) {
             log("Error processing request: " + e.getMessage());
-        } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                log("Error closing socket: " + e.getMessage());
-            }
         }
     }
 } 
@@ -1244,9 +1348,6 @@ import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.cluster.NodeStatus;
 import com.microtomcat.cluster.config.ClusterConfig;
 import com.microtomcat.cluster.config.ClusterConfigLoader;
-import com.microtomcat.cluster.heartbeat.HeartbeatService;
-import com.microtomcat.cluster.heartbeat.DefaultHeartbeatService;
-import com.microtomcat.cluster.NodeStatusManager;
 
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
@@ -1258,8 +1359,6 @@ public class BlockingHttpServer extends AbstractHttpServer {
     private StandardServer serverMBean;
     private ClusterConfig clusterConfig;
     private ClusterRegistry clusterRegistry;
-    private NodeStatusManager nodeStatusManager;
-    private HeartbeatService heartbeatService;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
@@ -1438,25 +1537,6 @@ public class BlockingHttpServer extends AbstractHttpServer {
             
             log("Cluster initialized with " + clusterConfig.getNodes().size() + " nodes");
             
-            // 初始化节点状态管理器
-            nodeStatusManager = new NodeStatusManager();
-            
-            // 初始化心跳服务
-            heartbeatService = new DefaultHeartbeatService(nodeStatusManager);
-            
-            // 从配置文件加载心跳配置
-            if (clusterConfig.getHeartbeatInterval() > 0) {
-                heartbeatService.setHeartbeatInterval(clusterConfig.getHeartbeatInterval());
-            }
-            if (clusterConfig.getHeartbeatTimeout() > 0) {
-                heartbeatService.setHeartbeatTimeout(clusterConfig.getHeartbeatTimeout());
-            }
-            
-            // 启动心跳服务
-            heartbeatService.start();
-            
-            log("Heartbeat service started");
-            
         } catch (Exception e) {
             log("Failed to initialize cluster: " + e.getMessage());
         }
@@ -1469,9 +1549,6 @@ public class BlockingHttpServer extends AbstractHttpServer {
 
     @Override
     protected void destroyInternal() throws LifecycleException {
-        if (heartbeatService != null) {
-            heartbeatService.stop();
-        }
         // 在服务器关闭时清理集群资源
         if (clusterRegistry != null) {
             for (ClusterNode node : clusterRegistry.getAllNodes()) {

@@ -6,13 +6,11 @@ import java.util.ArrayList;
 public class ClusterConfig {
     private String clusterName;
     private List<NodeConfig> nodes;
-    private int heartbeatInterval;
-    private int heartbeatTimeout;
+    private long heartbeatInterval = 5000; // 默认5秒
+    private long heartbeatTimeout = 3000;  // 默认3秒
 
     public ClusterConfig() {
         this.nodes = new ArrayList<>();
-        this.heartbeatInterval = 5000; // 默认5秒
-        this.heartbeatTimeout = 15000; // 默认15秒
     }
 
     // Getters and Setters
@@ -20,10 +18,18 @@ public class ClusterConfig {
     public void setClusterName(String clusterName) { this.clusterName = clusterName; }
     public List<NodeConfig> getNodes() { return nodes; }
     public void setNodes(List<NodeConfig> nodes) { this.nodes = nodes; }
-    public int getHeartbeatInterval() { return heartbeatInterval; }
-    public void setHeartbeatInterval(int heartbeatInterval) { this.heartbeatInterval = heartbeatInterval; }
-    public int getHeartbeatTimeout() { return heartbeatTimeout; }
-    public void setHeartbeatTimeout(int heartbeatTimeout) { this.heartbeatTimeout = heartbeatTimeout; }
+    public long getHeartbeatInterval() {
+        return heartbeatInterval;
+    }
+    public void setHeartbeatInterval(long heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
+    }
+    public long getHeartbeatTimeout() {
+        return heartbeatTimeout;
+    }
+    public void setHeartbeatTimeout(long heartbeatTimeout) {
+        this.heartbeatTimeout = heartbeatTimeout;
+    }
 
     public static class NodeConfig {
         private String name;

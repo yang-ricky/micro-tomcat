@@ -25,15 +25,15 @@
 
 ## 14.2 心跳机制与故障检测
 ### 心跳实现
-- [ ] **`HeartbeatService` 接口**：定义心跳检测方法  
-- [ ] **`DefaultHeartbeatService` 类**：实现心跳线程/定时器  
-- [ ] 在每个节点提供 `/ping` 健康检查接口  
-- [ ] 添加心跳超时配置（可在 `cluster-config.xml` 中定义）  
+- [x] **`HeartbeatService` 接口**：定义心跳检测方法  
+- [x] **`DefaultHeartbeatService` 类**：实现心跳线程/定时器  
+- [x] 在每个节点提供 `/ping` 健康检查接口  
+- [x] 添加心跳超时配置（可在 `cluster-config.xml` 中定义）  
 
 ### 状态管理
-- [ ] **`NodeStatusManager` 类**：根据心跳结果更新节点状态  
-- [ ] 添加节点状态变更事件（如 `onNodeDown()`, `onNodeUp()`）  
-- [ ] 在 `ClusterRegistry` 中维护节点可用性标记  
+- [x] **`NodeStatusManager` 类**：根据心跳结果更新节点状态  
+- [x] 添加节点状态变更事件（如 `onNodeDown()`, `onNodeUp()`）  
+- [x] 在 `ClusterRegistry` 中维护节点可用性标记  
 
 ### 验证要求
 - [ ] 正确记录心跳检测日志  
