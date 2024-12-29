@@ -18,6 +18,12 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.microtomcat.cluster.ClusterNode;
+import com.microtomcat.cluster.ClusterRegistry;
+import com.microtomcat.cluster.NodeStatus;
+import com.microtomcat.cluster.config.ClusterConfig;
+import com.microtomcat.cluster.config.ClusterConfigLoader;
+
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
     private final ProcessorPool processorPool;
@@ -26,6 +32,8 @@ public class BlockingHttpServer extends AbstractHttpServer {
     private volatile boolean running = true;
     private MBeanRegistry mbeanRegistry;
     private StandardServer serverMBean;
+    private ClusterConfig clusterConfig;
+    private ClusterRegistry clusterRegistry;
 
     public BlockingHttpServer(ServerConfig config) {
         super(config);
@@ -172,5 +180,64 @@ public class BlockingHttpServer extends AbstractHttpServer {
         } catch (JMException e) {
             throw new LifecycleException("Failed to initialize JMX support", e);
         }
+        
+        // 初始化集群配置
+        initializeCluster();
+    }
+
+    private void initializeCluster() {
+        try {
+            // 1. 加载集群配置
+            ClusterConfigLoader loader = new ClusterConfigLoader();
+            clusterConfig = loader.loadConfig();
+            
+            // 2. 获取集群注册表实例
+            clusterRegistry = ClusterRegistry.getInstance();
+            
+            // 3. 注册配置的节点
+            for (ClusterConfig.NodeConfig nodeConfig : clusterConfig.getNodes()) {
+                ClusterNode node = new ClusterNode(
+                    nodeConfig.getName(),
+                    nodeConfig.getHost(),
+                    nodeConfig.getPort()
+                );
+                
+                // 如果是当前节点，设置状态为RUNNING
+                if (isCurrentNode(nodeConfig)) {
+                    node.setStatus(NodeStatus.RUNNING);
+                }
+                
+                clusterRegistry.registerNode(node);
+            }
+            
+            log("Cluster initialized with " + clusterConfig.getNodes().size() + " nodes");
+            
+        } catch (Exception e) {
+            log("Failed to initialize cluster: " + e.getMessage());
+        }
+    }
+    
+    private boolean isCurrentNode(ClusterConfig.NodeConfig nodeConfig) {
+        return nodeConfig.getPort() == config.getPort() && 
+               "localhost".equals(nodeConfig.getHost());
+    }
+
+    @Override
+    protected void destroyInternal() throws LifecycleException {
+        // 在服务器关闭时清理集群资源
+        if (clusterRegistry != null) {
+            for (ClusterNode node : clusterRegistry.getAllNodes()) {
+                if (isCurrentNode(node)) {
+                    node.setStatus(NodeStatus.STOPPED);
+                    clusterRegistry.unregisterNode(node.getId());
+                }
+            }
+        }
+        super.destroyInternal();
+    }
+
+    private boolean isCurrentNode(ClusterNode node) {
+        return node.getPort() == config.getPort() && 
+               "localhost".equals(node.getHost());
     }
 } 

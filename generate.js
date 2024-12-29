@@ -9,10 +9,11 @@ const __dirname = path.dirname(__filename);
 // 指定要搜索的类名
 const className = [
     "HttpServer",
-    "Connector",
-    "ConnectorMBean",
-    "ProcessorPool",
-    "ProcessorPoolMBean",
+    "DefaultHeartbeatService",
+    "Wrapper",
+    "Context",
+    "WebAppClassLoader",
+    "Processor",
 ]
 
 // 定义要搜索的根目录

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cluster name="microTomcatCluster" heartbeatInterval="5000" heartbeatTimeout="15000">
+    <node name="node1" host="localhost" port="8080"/>
+    <node name="node2" host="localhost" port="8081"/>
+    <node name="node3" host="localhost" port="8082"/>
+</cluster> 

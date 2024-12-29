@@ -105,7 +105,7 @@ public class HttpServer extends AbstractHttpServer {
                 log("Successfully served file: " + uri);
             } else {
                 // 文件不存在，返回404
-                String errorMessage = "404 File Not Found";
+                String errorMessage = "404 File Not Found: " + uri;
                 output.write("HTTP/1.1 404 Not Found\r\n".getBytes());
                 output.write("Content-Type: text/plain\r\n".getBytes());
                 output.write(("Content-Length: " + errorMessage.length() + "\r\n").getBytes());
@@ -142,9 +142,23 @@ public class HttpServer extends AbstractHttpServer {
     }
 
     public static void main(String[] args) {
+        // 解析命令行参数
+        int port = DEFAULT_PORT; // 默认端口
+        
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].startsWith("--port=")) {
+                try {
+                    port = Integer.parseInt(args[i].substring("--port=".length()));
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid port number: " + args[i]);
+                    System.exit(1);
+                }
+            }
+        }
+
         try {
             ServerConfig config = new ServerConfig(
-                DEFAULT_PORT,    // 端口
+                port,           // 使用解析的端口
                 false,          // 使用阻塞式 IO
                 10,            // 线程池大小
                 WEB_ROOT       // Web根目录
