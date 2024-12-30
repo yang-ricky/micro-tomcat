@@ -1,11 +1,24 @@
 # micro-tomcat
 
-## 运行：
-```
-mvn clean package
-java -cp target/micro-tomcat-1.0-SNAPSHOT.jar com.microtomcat.HttpServer
-```
+
+
+## run
 
 ```
-mvn clean compile exec:java -Dexec.mainClass="com.microtomcat.Main"
+sh run.sh
 ```
+verify:
+```
+curl http://localhost:8080
+```
+
+or run with gateway
+```
+sh run_with_gateway.sh
+```
+
+verify:
+```
+curl http://localhost:8090
+```
+
