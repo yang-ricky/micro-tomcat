@@ -1,5 +1,7 @@
 package com.microtomcat.gateway;
 
+import com.microtomcat.cluster.ClusterNode;
+import com.microtomcat.cluster.NodeStatus;
 import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.gateway.lb.LoadBalancer;
 import com.microtomcat.gateway.lb.RoundRobinLoadBalancer;
@@ -25,11 +27,29 @@ public class GatewayServer {
         this.processorPool = new GatewayProcessorPool(10, loadBalancer, clusterRegistry);
     }
     
+    private void registerBackendNodes() {
+        // 注册默认的后端节点
+        ClusterNode node1 = new ClusterNode("node1", "localhost", 8080);
+        ClusterNode node2 = new ClusterNode("node2", "localhost", 8081);
+        ClusterNode node3 = new ClusterNode("node3", "localhost", 8082);
+        
+        node1.setStatus(NodeStatus.RUNNING);
+        node2.setStatus(NodeStatus.RUNNING);
+        node3.setStatus(NodeStatus.RUNNING);
+        
+        clusterRegistry.registerNode(node1);
+        clusterRegistry.registerNode(node2);
+        clusterRegistry.registerNode(node3);
+    }
+    
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
         running.set(true);
-        processorPool.start();
         
+        // 注册后端节点
+        registerBackendNodes();
+        
+        processorPool.start();
         
         // 接受连接的主循环
         while (running.get()) {
@@ -38,6 +58,7 @@ public class GatewayServer {
                 processorPool.process(socket);
             } catch (IOException e) {
                 if (running.get()) {
+                    e.printStackTrace();
                 }
             }
         }
