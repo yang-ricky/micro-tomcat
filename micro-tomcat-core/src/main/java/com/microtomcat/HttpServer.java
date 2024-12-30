@@ -33,7 +33,7 @@ public class HttpServer extends AbstractHttpServer {
     @Override
     protected void log(String message) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME);
-        System.out.printf("[%s] %s%n", timestamp, message);
+        System.out.printf("[HttpServer %s] %s%n", timestamp, message);
     }
 
     @Override

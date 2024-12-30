@@ -27,15 +27,14 @@ start_node() {
          -Dcom.sun.management.jmxremote.port=${JMX_PORT} \
          -Dcom.sun.management.jmxremote.authenticate=false \
          -Dcom.sun.management.jmxremote.ssl=false \
-         -cp target/micro-tomcat-1.0-SNAPSHOT.jar \
+         -cp target/classes:target/dependency/* \
          com.microtomcat.HttpServer --port=${PORT} &
     
     local PID=$!
     SERVER_PIDS+=($PID)
     echo "Node started with PID: $PID"
     
-    # 等待节点启动
-    sleep 5  # 增加等待时间，确保节点完全启动
+    sleep 5
 }
 
 # 停止所有节点

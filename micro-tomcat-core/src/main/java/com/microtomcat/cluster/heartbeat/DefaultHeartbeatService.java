@@ -36,6 +36,7 @@ public class DefaultHeartbeatService implements HeartbeatService {
             scheduler.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            System.out.println("[HeartbeatService] Interrupted while stopping");
         }
     }
 

@@ -3,3 +3,4 @@ node_modules/
 .idea/
 output.txt
 micro-tomcat.iml
+.DS_Store

@@ -93,8 +93,8 @@ public class Connector extends LifecycleBase implements Runnable, ConnectorMBean
     }
     
     private void log(String message) {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        System.out.printf("[%s] [Connector] %s%n", timestamp, message);
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME);
+        System.out.printf("[Connector %s] %s%n", timestamp, message);
     }
     
     @Override

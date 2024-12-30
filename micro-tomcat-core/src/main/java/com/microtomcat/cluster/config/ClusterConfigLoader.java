@@ -18,7 +18,7 @@ public class ClusterConfigLoader {
         try {
             File configFile = new File(configPath);
             if (!configFile.exists()) {
-                log("Config file not found: " + configPath);
+                System.out.println("[ClusterConfigLoader] Config file not found: " + configPath);
                 return createDefaultConfig();
             }
 
@@ -30,7 +30,7 @@ public class ClusterConfigLoader {
             return parseDocument(doc);
 
         } catch (Exception e) {
-            log("Error loading cluster configuration: " + e.getMessage());
+            System.out.println("[ClusterConfigLoader] Error loading cluster configuration: " + e.getMessage());
             return createDefaultConfig();
         }
     }
@@ -45,7 +45,7 @@ public class ClusterConfigLoader {
         defaultNode.setPort(8080);
         config.getNodes().add(defaultNode);
         
-        log("Created default cluster configuration");
+        System.out.println("[ClusterConfigLoader] Created default cluster configuration");
         return config;
     }
 
@@ -81,9 +81,5 @@ public class ClusterConfigLoader {
         }
 
         return config;
-    }
-
-    private void log(String message) {
-        System.out.println("[ClusterConfigLoader] " + message);
     }
 } 

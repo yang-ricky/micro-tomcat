@@ -5,8 +5,14 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.microtomcat</groupId>
-    <artifactId>micro-tomcat</artifactId>
+    <artifactId>micro-tomcat-parent</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>micro-tomcat-core</module>
+        <module>micro-tomcat-gateway</module>
+    </modules>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>

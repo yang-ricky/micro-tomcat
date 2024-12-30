@@ -46,7 +46,6 @@
 ### 存储实现
 - [ ] **`DistributedSessionManager` 类**：负责分布式会话管理  
 - [ ] **`SessionStoreAdapter` 接口**：定义访问底层存储的方法  
-- [ ] **`RedisSessionStore` 类**（示例）：实现基于 Redis 的会话存储  
 - [ ] 会话同步机制（可在更新会话后即时写入底层存储）
 
 ### 会话管理

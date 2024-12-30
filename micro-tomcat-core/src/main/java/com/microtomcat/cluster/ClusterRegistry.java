@@ -19,14 +19,14 @@ public class ClusterRegistry {
     public void registerNode(ClusterNode node) {
         if (validateNode(node)) {
             nodes.put(node.getId(), node);
-            log("Node registered: " + node);
+            System.out.println("[ClusterRegistry] Node registered: " + node);
         }
     }
 
     public void unregisterNode(String nodeId) {
         ClusterNode node = nodes.remove(nodeId);
         if (node != null) {
-            log("Node unregistered: " + node);
+            System.out.println("[ClusterRegistry] Node unregistered: " + node);
         }
     }
 
@@ -40,22 +40,18 @@ public class ClusterRegistry {
 
     private boolean validateNode(ClusterNode node) {
         if (node.getName() == null || node.getName().trim().isEmpty()) {
-            log("Invalid node name");
+            System.out.println("[ClusterRegistry] Invalid node name");
             return false;
         }
         if (node.getHost() == null || node.getHost().trim().isEmpty()) {
-            log("Invalid host");
+            System.out.println("[ClusterRegistry] Invalid host");
             return false;
         }
         if (node.getPort() <= 0 || node.getPort() > 65535) {
-            log("Invalid port number");
+            System.out.println("[ClusterRegistry] Invalid port number");
             return false;
         }
         return true;
-    }
-
-    private void log(String message) {
-        System.out.println("[ClusterRegistry] " + message);
     }
 
     public void setCurrentNode(ClusterNode node) {
