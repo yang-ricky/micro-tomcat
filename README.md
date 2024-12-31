@@ -1,24 +1,20 @@
 # micro-tomcat
 
+## Prerequisites
 
+- JDK 1.8
+- Maven 3.x
 
-## run
+## Usage
 
-```
+### Starting the Server
+
+```bash
 sh run.sh
 ```
-verify:
-```
-curl http://localhost:8080
-```
 
-or run with gateway
-```
-sh run_with_gateway.sh
-```
+### Testing the Service
 
-verify:
+```bash
+sh verify.sh
 ```
-curl http://localhost:8090
-```
-

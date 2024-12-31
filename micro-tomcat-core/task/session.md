@@ -36,65 +36,65 @@
 - [x] 在 `ClusterRegistry` 中维护节点可用性标记  
 
 ### 验证要求
-- [ ] 正确记录心跳检测日志  
-- [ ] 准确标记故障节点状态  
-- [ ] 能够检测到节点恢复  
+- [x] 正确记录心跳检测日志  
+- [x] 准确标记故障节点状态  
+- [x] 能够检测到节点恢复  
 
 ---
 
 ## 14.3 分布式会话存储
 ### 存储实现
-- [ ] **`DistributedSessionManager` 类**：负责分布式会话管理  
-- [ ] **`SessionStoreAdapter` 接口**：定义访问底层存储的方法  
-- [ ] 会话同步机制（可在更新会话后即时写入底层存储）
+- [x] **`DistributedSessionManager` 类**：负责分布式会话管理  
+- [x] **`SessionStoreAdapter` 接口**：定义访问底层存储的方法  
+- [x] 会话同步机制（可在更新会话后即时写入底层存储）
 
 ### 会话管理
-- [ ] 重写 `getSession()` 和 `createSession()` 方法，统一从 `SessionStoreAdapter` 获取或创建会话  
-- [ ] 实现会话数据序列化/反序列化（可使用 JSON 或 Java 序列化）  
-- [ ] 添加会话过期处理（可由 Redis TTL 或定时扫描过期）  
+- [x] 重写 `getSession()` 和 `createSession()` 方法，统一从 `SessionStoreAdapter` 获取或创建会话  
+- [x] 实现会话数据序列化/反序列化（可使用 JSON 或 Java 序列化）  
+- [x] 添加会话过期处理（可由 Redis TTL 或定时扫描过期）  
 
 ### 验证要求
-- [ ] 会话能在不同节点间共享  
-- [ ] 节点故障时会话数据不丢失  
-- [ ] 会话同步性能满足要求  
+- [x] 会话能在不同节点间共享  
+- [x] 节点故障时会话数据不丢失  
+- [x] 会话同步性能满足要求  
 
 ---
 
 ## 14.4 负载均衡策略
 ### 基础实现
-- [ ] **`LoadBalancer` 接口**：定义选择节点的方法：`ClusterNode selectNode(Request req)`  
-- [ ] **`RoundRobinLoadBalancer` 类**：实现轮询策略  
-- [ ] **`LeastConnectionsLoadBalancer` 类**：实现最少连接策略  
-- [ ] **`HashLoadBalancer` 类**：实现哈希策略（根据 IP 或 Session ID）  
+- [x] **`LoadBalancer` 接口**：定义选择节点的方法：`ClusterNode selectNode(Request req)`  
+- [x] **`RoundRobinLoadBalancer` 类**：实现轮询策略  
+- [x] **`LeastConnectionsLoadBalancer` 类**：实现最少连接策略  
+- [x] **`HashLoadBalancer` 类**：实现哈希策略（根据 IP 或 Session ID）  
 
 ### 高级特性
-- [ ] 会话粘性支持：在 `LoadBalancer` 内根据 Session ID 决定节点（可与 Hash 策略结合）  
-- [ ] 故障节点自动跳过：当节点标记为故障时，负载均衡不再分配请求给该节点  
-- [ ] 请求重试机制：若目标节点无法访问，自动重试下一个可用节点  
+- [x] 会话粘性支持：在 `LoadBalancer` 内根据 Session ID 决定节点（可与 Hash 策略结合）  
+- [x] 故障节点自动跳过：当节点标记为故障时，负载均衡不再分配请求给该节点  
+- [x] 请求重试机制：若目标节点无法访问，自动重试下一个可用节点  
 
 ### 验证要求
-- [ ] 请求能均匀分布到各节点（轮询或最少连接）  
-- [ ] 故障节点自动排除，避免无效请求  
-- [ ] 会话粘性正常工作，确保同一用户会话落在同一节点  
+- [x] 请求能均匀分布到各节点（轮询或最少连接）  
+- [x] 故障节点自动排除，避免无效请求  
+- [x] 会话粘性正常工作，确保同一用户会话落在同一节点  
 
 ---
 
 ## 14.5 故障检测与自动恢复
 ### 故障处理
-- [ ] **`FailureDetector` 接口**：定义故障判定和事件触发  
-- [ ] **`DefaultFailureDetector` 类**：集成心跳结果，实现故障事件通知  
-- [ ] 故障节点资源清理（如释放连接池、内存占用等）  
-- [ ] 实现请求重路由：故障节点不可用后，及时将请求转发到其他节点  
+- [x] **`FailureDetector` 接口**：定义故障判定和事件触发  
+- [x] **`DefaultFailureDetector` 类**：集成心跳结果，实现故障事件通知  
+- [x] 故障节点资源清理（如释放连接池、内存占用等）  
+- [x] 实现请求重路由：故障节点不可用后，及时将请求转发到其他节点  
 
 ### 自动恢复
-- [ ] 节点重新注册：故障节点恢复后，向 `ClusterRegistry` 通知自身上线  
-- [ ] 资源重新分配：在分布式会话或缓存层重建所需数据  
-- [ ] 实现配置动态更新：当集群拓扑变更时，动态刷新 `LoadBalancer`、`SessionStoreAdapter` 等组件  
+- [x] 节点重新注册：故障节点恢复后，向 `ClusterRegistry` 通知自身上线  
+- [x] 资源重新分配：在分布式会话或缓存层重建所需数据  
+- [x] 实现配置动态更新：当集群拓扑变更时，动态刷新 `LoadBalancer`、`SessionStoreAdapter` 等组件  
 
 ### 验证要求
-- [ ] 故障转移过程无明显服务中断  
-- [ ] 节点恢复后自动加入集群  
-- [ ] 完整的故障处理日志记录  
+- [x] 故障转移过程无明显服务中断  
+- [x] 节点恢复后自动加入集群  
+- [x] 完整的故障处理日志记录  
 
 ---
 
