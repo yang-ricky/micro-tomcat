@@ -61,4 +61,9 @@ public class ClusterRegistry {
     public ClusterNode getCurrentNode() {
         return currentNode;
     }
+
+    public void updateNodeStatus(ClusterNode node, NodeStatus status) {
+        node.setStatus(status);
+        System.out.println("[ClusterRegistry] Node status updated: " + node + " -> " + status);
+    }
 } 

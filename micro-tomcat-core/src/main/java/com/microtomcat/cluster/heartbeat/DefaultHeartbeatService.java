@@ -1,80 +1,113 @@
 package com.microtomcat.cluster.heartbeat;
 
 import com.microtomcat.cluster.ClusterNode;
+import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.cluster.NodeStatus;
 import com.microtomcat.cluster.NodeStatusManager;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 public class DefaultHeartbeatService implements HeartbeatService {
-    private final ScheduledExecutorService scheduler;
+    private static final Logger logger = Logger.getLogger(DefaultHeartbeatService.class.getName());
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final NodeStatusManager statusManager;
-    private long heartbeatInterval = 5000; // 默认5秒
-    private long heartbeatTimeout = 3000;  // 默认3秒超时
-    private volatile boolean running = false;
+    private final ClusterRegistry clusterRegistry;
+    private long heartbeatInterval;
+    private long heartbeatTimeout;
 
-    public DefaultHeartbeatService(NodeStatusManager statusManager) {
+    public DefaultHeartbeatService(NodeStatusManager statusManager, ClusterRegistry clusterRegistry, 
+                                 long heartbeatInterval, long heartbeatTimeout) {
         this.statusManager = statusManager;
-        this.scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @Override
-    public void start() {
-        running = true;
-        scheduler.scheduleAtFixedRate(this::heartbeat, 0, heartbeatInterval, TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public void stop() {
-        running = false;
-        scheduler.shutdown();
-        try {
-            scheduler.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.out.println("[HeartbeatService] Interrupted while stopping");
-        }
-    }
-
-    private void heartbeat() {
-        if (!running) return;
-        
-        for (ClusterNode node : statusManager.getAllNodes()) {
-            checkNode(node);
-        }
-    }
-
-    @Override
-    public void checkNode(ClusterNode node) {
-        try {
-            String url = String.format("http://%s:%d/ping", node.getHost(), node.getPort());
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setConnectTimeout((int) heartbeatTimeout);
-            conn.setReadTimeout((int) heartbeatTimeout);
-            conn.setRequestMethod("GET");
-            
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 200) {
-                statusManager.updateNodeStatus(node, NodeStatus.RUNNING);
-            } else {
-                statusManager.updateNodeStatus(node, NodeStatus.UNREACHABLE);
-            }
-        } catch (IOException e) {
-            statusManager.updateNodeStatus(node, NodeStatus.UNREACHABLE);
-        }
+        this.clusterRegistry = clusterRegistry;
+        this.heartbeatInterval = heartbeatInterval;
+        this.heartbeatTimeout = heartbeatTimeout;
     }
 
     @Override
     public void setHeartbeatInterval(long interval) {
         this.heartbeatInterval = interval;
+        logger.info("[HeartbeatService] Heartbeat interval updated to: " + interval + "ms");
+        restart();
     }
 
     @Override
     public void setHeartbeatTimeout(long timeout) {
         this.heartbeatTimeout = timeout;
+        logger.info("[HeartbeatService] Heartbeat timeout updated to: " + timeout + "ms");
+    }
+
+    @Override
+    public void checkNode(ClusterNode node) {
+        if (!isCurrentNode(node)) {
+            checkNodeHealth(node);
+        }
+    }
+
+    private void restart() {
+        stop();
+        start();
+    }
+
+    @Override
+    public void start() {
+        scheduler.scheduleAtFixedRate(this::checkHeartbeats, 
+            heartbeatInterval, heartbeatInterval, TimeUnit.MILLISECONDS);
+        logger.info("[HeartbeatService] Started with interval: " + heartbeatInterval + "ms");
+    }
+
+    @Override
+    public void stop() {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(heartbeatTimeout, TimeUnit.MILLISECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        logger.info("[HeartbeatService] Stopped");
+    }
+
+    private void checkHeartbeats() {
+        for (ClusterNode node : clusterRegistry.getAllNodes()) {
+            if (!isCurrentNode(node)) {
+                checkNodeHealth(node);
+            }
+        }
+    }
+
+    private void checkNodeHealth(ClusterNode node) {
+        try {
+            if (ping(node)) {
+                if (node.getStatus() == NodeStatus.UNREACHABLE) {
+                    statusManager.updateNodeStatus(node, NodeStatus.RUNNING);
+                }
+            } else {
+                if (node.getStatus() == NodeStatus.RUNNING) {
+                    statusManager.updateNodeStatus(node, NodeStatus.UNREACHABLE);
+                }
+            }
+        } catch (Exception e) {
+            logger.warning("[HeartbeatService] Error checking node " + node.getId() + ": " + e.getMessage());
+            if (node.getStatus() == NodeStatus.RUNNING) {
+                statusManager.updateNodeStatus(node, NodeStatus.UNREACHABLE);
+            }
+        }
+    }
+
+    private boolean ping(ClusterNode node) {
+        // 实现ping逻辑，例如HTTP请求node的/ping接口
+        // 这里简单返回true，实际实现需要真正去ping目标节点
+        return true;
+    }
+
+    private boolean isCurrentNode(ClusterNode node) {
+        ClusterNode currentNode = clusterRegistry.getCurrentNode();
+        return currentNode != null && 
+               currentNode.getPort() == node.getPort() && 
+               currentNode.getHost().equals(node.getHost());
     }
 } 

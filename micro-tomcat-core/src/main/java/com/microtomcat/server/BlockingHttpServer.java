@@ -27,6 +27,8 @@ import com.microtomcat.cluster.NodeStatusManager;
 import com.microtomcat.cluster.LoggingNodeStatusListener;
 import com.microtomcat.cluster.heartbeat.HeartbeatService;
 import com.microtomcat.cluster.heartbeat.DefaultHeartbeatService;
+import com.microtomcat.cluster.failover.FailureDetector;
+import com.microtomcat.cluster.failover.DefaultFailureDetector;
 
 public class BlockingHttpServer extends AbstractHttpServer {
     private final ExecutorService executorService;
@@ -195,18 +197,25 @@ public class BlockingHttpServer extends AbstractHttpServer {
             ClusterConfigLoader loader = new ClusterConfigLoader();
             clusterConfig = loader.loadConfig();
             
-            // 2. 创建状态管理器和心跳服务
-            NodeStatusManager nodeStatusManager = new NodeStatusManager();
-            nodeStatusManager.addStatusListener("logging", new LoggingNodeStatusListener());
-            
-            HeartbeatService heartbeatService = new DefaultHeartbeatService(nodeStatusManager);
-            heartbeatService.setHeartbeatInterval(clusterConfig.getHeartbeatInterval());
-            heartbeatService.setHeartbeatTimeout(clusterConfig.getHeartbeatTimeout());
-            
-            // 3. 获取集群注册表实例
+            // 2. 获取集群注册表实例
             clusterRegistry = ClusterRegistry.getInstance();
             
-            // 4. 注册配置的节点
+            // 3. 创建故障检测器和状态管理器
+            FailureDetector failureDetector = new DefaultFailureDetector(clusterRegistry);
+            NodeStatusManager nodeStatusManager = new NodeStatusManager(clusterRegistry, failureDetector);
+            
+            // 4. 添加日志监听器
+            nodeStatusManager.addStatusListener("logging", new LoggingNodeStatusListener());
+            
+            // 5. 创建心跳服务
+            HeartbeatService heartbeatService = new DefaultHeartbeatService(
+                nodeStatusManager,
+                clusterRegistry,
+                clusterConfig.getHeartbeatInterval(),
+                clusterConfig.getHeartbeatTimeout()
+            );
+            
+            // 6. 注册配置的节点
             for (ClusterConfig.NodeConfig nodeConfig : clusterConfig.getNodes()) {
                 ClusterNode node = new ClusterNode(
                     nodeConfig.getName(),
@@ -217,13 +226,13 @@ public class BlockingHttpServer extends AbstractHttpServer {
                 // 如果是当前节点，设置状态为RUNNING
                 if (isCurrentNode(nodeConfig)) {
                     node.setStatus(NodeStatus.RUNNING);
+                    clusterRegistry.setCurrentNode(node);
                 }
                 
                 clusterRegistry.registerNode(node);
-                nodeStatusManager.addNode(node);
             }
             
-            // 5. 启动心跳服务
+            // 7. 启动心跳服务
             heartbeatService.start();
             
             log("Cluster initialized with " + clusterConfig.getNodes().size() + " nodes");
