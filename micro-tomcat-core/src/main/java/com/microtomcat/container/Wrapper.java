@@ -26,6 +26,10 @@ public class Wrapper extends ContainerBase {
         this.servletClass = servletClass;
     }
 
+    public void setServlet(Servlet servlet) {
+        this.servlet = servlet;
+    }
+
     @Override
     protected void initInternal() throws LifecycleException {
         try {
@@ -66,7 +70,7 @@ public class Wrapper extends ContainerBase {
             } else {
                 throw new ServletException("No servlet instance available");
             }
-        } catch (ServletException | IOException e) {
+        } catch (Exception e) {
             log("Error invoking servlet: " + e.getMessage());
             try {
                 response.sendError(500, "Internal Server Error: " + e.getMessage());
@@ -79,15 +83,13 @@ public class Wrapper extends ContainerBase {
     @Override
     protected void startInternal() throws LifecycleException {
         log("Starting Wrapper: " + name);
-        // try {
-        //     if (servlet == null && servletClass != null) {
-        //         Class<?> clazz = Class.forName(servletClass);
-        //         servlet = (Servlet) clazz.getDeclaredConstructor().newInstance();
-        //         servlet.init();
-        //     }
-        // } catch (Exception e) {
-        //     throw new LifecycleException("Failed to initialize servlet", e);
-        // }
+        try {
+            if (servlet == null) {
+                initInternal();
+            }
+        } catch (Exception e) {
+            throw new LifecycleException("Failed to start wrapper", e);
+        }
     }
 
     @Override
@@ -102,6 +104,10 @@ public class Wrapper extends ContainerBase {
     @Override
     protected void destroyInternal() throws LifecycleException {
         log("Destroying Wrapper: " + name);
+        if (servlet != null) {
+            servlet.destroy();
+            servlet = null;
+        }
     }
 
     public void addInitParameter(String name, String value) {

@@ -14,7 +14,7 @@ declare -a SERVER_PIDS
 
 # 编译项目
 echo -e "${GREEN}Compiling project...${NC}"
-mvn clean package
+mvn clean package dependency:copy-dependencies
 
 # 启动核心服务节点
 start_core_node() {
@@ -26,11 +26,14 @@ start_core_node() {
     # 切换到 micro-tomcat-core 目录执行，这样可以正确找到 webroot
     cd micro-tomcat-core
     
+    # 构建完整的类路径，包括所有依赖
+    CLASSPATH="target/classes:target/dependency/*"
+    
     java -Dcom.sun.management.jmxremote \
          -Dcom.sun.management.jmxremote.port=${JMX_PORT} \
          -Dcom.sun.management.jmxremote.authenticate=false \
          -Dcom.sun.management.jmxremote.ssl=false \
-         -cp target/classes:target/dependency/* \
+         -cp ${CLASSPATH} \
          com.microtomcat.HttpServer --port=${PORT} &
     
     local PID=$!

@@ -7,6 +7,8 @@ import com.microtomcat.example.SessionTestServlet;
 import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
+import com.microtomcat.connector.ServletRequestWrapper;
+import com.microtomcat.connector.ServletResponseWrapper;
 import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.loader.WebAppClassLoader;
@@ -14,13 +16,24 @@ import com.microtomcat.loader.ClassLoaderManager;
 import com.microtomcat.session.distributed.DistributedSessionManager;
 import com.microtomcat.session.distributed.InMemoryReplicatedSessionStore;
 import com.microtomcat.session.distributed.SessionStoreAdapter;
+
+// 添加 Servlet API 相关导入
+import javax.servlet.Servlet;
+import javax.servlet.ServletException;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import java.util.Enumeration;
+
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Context extends ContainerBase {
     private final String docBase;
     private final WebAppClassLoader webAppClassLoader;
     private final SessionManager sessionManager;
+    private Map<String, Servlet> servletMap = new ConcurrentHashMap<>();
 
     public Context(String name, String docBase) throws IOException {
         this.name = name;
@@ -79,19 +92,75 @@ public class Context extends ContainerBase {
         return sessionManager;
     }
 
+    public void addServlet(String name, Servlet servlet) {
+        servletMap.put(name, servlet);
+        try {
+            // 创建一个简单的 ServletConfig 实现
+            ServletConfig config = new ServletConfig() {
+                @Override
+                public String getServletName() {
+                    return name;
+                }
+
+                @Override
+                public ServletContext getServletContext() {
+                    return null; // TODO: 实现 ServletContext
+                }
+
+                @Override
+                public String getInitParameter(String name) {
+                    return null;
+                }
+
+                @Override
+                public Enumeration<String> getInitParameterNames() {
+                    return new Enumeration<String>() {
+                        @Override
+                        public boolean hasMoreElements() {
+                            return false;
+                        }
+
+                        @Override
+                        public String nextElement() {
+                            return null;
+                        }
+                    };
+                }
+            };
+            servlet.init(config);
+        } catch (ServletException e) {
+            log("Failed to initialize servlet: " + name);
+        }
+    }
+
     @Override
     public void invoke(Request request, Response response) {
+        // 优先处理 dispatcherServlet
+        Servlet dispatcher = servletMap.get("dispatcherServlet");
+        if (dispatcher != null) {
+            try {
+                // 将 Request/Response 适配成 ServletRequest/ServletResponse
+                ServletRequestWrapper servletRequest = new ServletRequestWrapper(request);
+                ServletResponseWrapper servletResponse = new ServletResponseWrapper(response);
+                
+                dispatcher.service(servletRequest, servletResponse);
+                return; // 处理完请求，就直接return
+            } catch (NoRouteMatchException e) {
+                // 继续后面静态资源处理
+            } catch (ServletException | IOException e) {
+                log("Error invoking dispatcherServlet: " + e.getMessage());
+            }
+        }
+
+        // 原有的静态资源或其他 servlet 处理逻辑
         request.setContext(this);
-        
         String servletPath = getServletPath(request.getUri());
         if (servletPath != null && servletPath.startsWith("/servlet/")) {
             String servletName = servletPath.substring("/servlet/".length());
-            // 移除路径分隔符，只保留 Servlet 名称
             servletName = servletName.replace('/', '.');
             try {
                 Wrapper wrapper = (Wrapper) findChild(servletName);
                 if (wrapper == null) {
-                    // 动态创建Wrapper，使用简单的类名
                     wrapper = new Wrapper(servletName, servletName.substring(servletName.lastIndexOf('.') + 1));
                     addChild(wrapper);
                     wrapper.init();
@@ -99,7 +168,7 @@ public class Context extends ContainerBase {
                 }
                 wrapper.invoke(request, response);
             } catch (Exception e) {
-                log("Error processing servlet request: " + e.getMessage());
+                log("Error processing request: " + e.getMessage());
                 try {
                     response.sendError(500, "Internal Server Error: " + e.getMessage());
                 } catch (IOException ioe) {

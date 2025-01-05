@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Collections;
+import java.util.Enumeration;
 
 import com.microtomcat.session.Session;
 import com.microtomcat.session.SessionManager;
@@ -25,6 +27,11 @@ public class Request {
     private final StringBuilder requestContent = new StringBuilder();
     private BufferedReader reader;
     private String body;
+    private final Map<String, String[]> parameters = new HashMap<>();
+    private final Map<String, Object> attributes = new HashMap<>();
+    private int serverPort = 8080;
+    private String remoteAddr;
+    private String scheme = "http";
 
     public Request(InputStream input, SessionManager sessionManager) {
         this.input = input;
@@ -152,5 +159,87 @@ public class Request {
 
     public String getBody() {
         return body;
+    }
+
+    public String getParameter(String name) {
+        String[] values = parameters.get(name);
+        return values != null && values.length > 0 ? values[0] : null;
+    }
+
+    public String getContentType() {
+        return headers.get("Content-Type");
+    }
+
+    public int getContentLength() {
+        String length = headers.get("Content-Length");
+        return length != null ? Integer.parseInt(length) : -1;
+    }
+
+    public Object getAttribute(String name) {
+        return attributes.get(name);
+    }
+
+    public Enumeration<String> getAttributeNames() {
+        return Collections.enumeration(attributes.keySet());
+    }
+
+    public void setAttribute(String name, Object value) {
+        attributes.put(name, value);
+    }
+
+    public void removeAttribute(String name) {
+        attributes.remove(name);
+    }
+
+    public Enumeration<String> getParameterNames() {
+        return Collections.enumeration(parameters.keySet());
+    }
+
+    public String[] getParameterValues(String name) {
+        return parameters.get(name);
+    }
+
+    public Map<String, String[]> getParameterMap() {
+        return Collections.unmodifiableMap(parameters);
+    }
+
+    public int getServerPort() {
+        return serverPort;
+    }
+
+    public String getRemoteAddr() {
+        return remoteAddr != null ? remoteAddr : "127.0.0.1";
+    }
+
+    public String getRemoteHost() {
+        return getRemoteAddr();
+    }
+
+    public int getRemotePort() {
+        return 0; // 默认值
+    }
+
+    public String getLocalName() {
+        return "localhost";
+    }
+
+    public String getLocalAddr() {
+        return "127.0.0.1";
+    }
+
+    public int getLocalPort() {
+        return serverPort;
+    }
+
+    public String getScheme() {
+        return scheme;
+    }
+
+    public void setParameter(String name, String value) {
+        parameters.put(name, new String[]{value});
+    }
+
+    public void setParameter(String name, String[] values) {
+        parameters.put(name, values);
     }
 }
