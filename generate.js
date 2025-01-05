@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const config = {
     isAll: true,
     // 要排除的目录名称数组
-    excludedDirs: ['micro-tomcat-gateway'],
+    excludedDirs: ['micro-tomcat-gateway',"webroot"],
     // 要搜索的类名（当 isAll 为 false 时使用）
     className: [
         "BeanDefinition",
@@ -71,6 +71,14 @@ function shouldExcludeDirectory(dirPath) {
 function shouldProcessFile(filePath, fileName) {
     // 检查文件是否在排除目录中
     if (shouldExcludeDirectory(filePath)) {
+        return false;
+    }
+
+    // 排除测试文件
+    if (fileName.endsWith('Test.java') || 
+        fileName.endsWith('Tests.java') || 
+        filePath.includes('/test/') || 
+        filePath.includes('\\test\\')) {
         return false;
     }
 
