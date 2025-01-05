@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # 默认配置
-CORE_PORTS=(8080 8081 8082)
+CORE_PORTS=(8080)
 JMX_PORT_START=9999
 
 # 存储进程ID
