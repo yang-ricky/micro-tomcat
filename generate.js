@@ -6,18 +6,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 添加 isAll 配置
-const isAll = true;
-
-// 指定要搜索的类名
-const className = [
-    "BeanDefinition",
-    "BeanFactory",
-    "DefaultBeanFactory",
-    "DefaultBeanDefinition",
-    "XmlBeanDefinitionReader",
-    "BeanDefinitionHolder",
-]
+// 配置选项
+const config = {
+    isAll: true,
+    // 要排除的目录名称数组
+    excludedDirs: ['micro-tomcat-gateway'],
+    // 要搜索的类名（当 isAll 为 false 时使用）
+    className: [
+        "BeanDefinition",
+        "BeanFactory",
+        "DefaultBeanFactory",
+        "DefaultBeanDefinition",
+        "XmlBeanDefinitionReader",
+        "BeanDefinitionHolder",
+    ]
+};
 
 // 定义要搜索的根目录
 const rootDir = path.resolve(__dirname);
@@ -47,23 +50,36 @@ function removeComments(code) {
 }
 
 /**
+ * 检查目录是否应该被排除
+ * @param {string} dirName - 目录名称
+ * @returns {boolean} - 是否应该排除该目录
+ */
+function shouldExcludeDirectory(dirPath) {
+    // 检查当前目录名是否在排除列表中
+    return config.excludedDirs.some(excludedDir => 
+        dirPath.includes(path.sep + excludedDir) || 
+        dirPath.endsWith(excludedDir)
+    );
+}
+
+/**
  * 检查文件是否应该被处理
  * @param {string} filePath - 文件路径
  * @param {string} fileName - 文件名
  * @returns {boolean} - 是否应该处理该文件
  */
 function shouldProcessFile(filePath, fileName) {
-    // 排除测试文件
-    if (filePath.includes('test') || fileName.includes('Test')) {
+    // 检查文件是否在排除目录中
+    if (shouldExcludeDirectory(filePath)) {
         return false;
     }
 
-    if (isAll) {
+    if (config.isAll) {
         return true;
     }
 
-    // 当 isAll 为 false 时，使用原来的类名匹配逻辑
-    return className.some(name => fileName.includes(name));
+    // 当 isAll 为 false 时，使用类名匹配逻辑
+    return config.className.some(name => fileName.includes(name));
 }
 
 /**
@@ -78,8 +94,9 @@ async function traverseDirectory(dir) {
             const fullPath = path.join(dir, item.name);
 
             if (item.isDirectory()) {
-                // 忽略 node_modules 和其他你想忽略的目录
-                if (item.name === 'node_modules' || item.name === '.git') {
+                // 检查是否应该排除该目录
+                if (shouldExcludeDirectory(fullPath)) {
+                    console.log(`跳过排除的目录: ${fullPath}`);
                     continue;
                 }
                 // 递归遍历子目录
