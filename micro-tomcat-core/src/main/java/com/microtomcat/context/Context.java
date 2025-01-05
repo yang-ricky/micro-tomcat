@@ -59,19 +59,7 @@ public class Context extends ContainerBase {
                 Wrapper sessionTestWrapper = new Wrapper("SessionTestServlet", "com.microtomcat.example.SessionTestServlet");
                 addChild(helloWrapper);
                 addChild(sessionTestWrapper);
-                Wrapper webRootWrapper = new Wrapper("WebRootServlet", "WebRootServlet");
-                addChild(webRootWrapper);
-            } else if (name.equals("/app1")) {  // app1 上下文
-                // 注册 App1Servlet
-                log("Registering App1Servlet...");
-                Wrapper app1Wrapper = new Wrapper("App1Servlet", "App1Servlet");
-                addChild(app1Wrapper);
-            } else if (name.equals("/app2")) {  // app2 上下文
-                // 注册 App2Servlet
-                log("Registering App2Servlet...");
-                Wrapper app2Wrapper = new Wrapper("App2Servlet", "App2Servlet");
-                addChild(app2Wrapper);
-            }
+            } 
 
             log("Successfully registered servlets for context: " + name);
         } catch (Exception e) {

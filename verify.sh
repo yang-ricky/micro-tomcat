@@ -17,11 +17,6 @@ TEST_PATHS=(
     "/ping"
     "/servlet/HelloServlet"
     "/servlet/SessionTestServlet"
-    "/servlet/WebRootServlet"
-    "/app1/servlet/App1Servlet"
-    "/app2/servlet/App2Servlet"
-    "/app1/hello.txt"
-    "/app2/hello.txt"
 )
 TEST_NAMES=(
     "Root Access"

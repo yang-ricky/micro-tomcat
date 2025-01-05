@@ -51,9 +51,6 @@ public class ServletLoader extends URLClassLoader {
             String[] paths = {
                 // 1. 直接从 webroot 加载
                 webRoot + "/" + name + ".class",
-                // 2. 从应用的 WEB-INF/classes 加载
-                webRoot + "/app1/WEB-INF/classes/" + name + ".class",
-                webRoot + "/app2/WEB-INF/classes/" + name + ".class",
                 // 3. 从当前上下文的 WEB-INF/classes 加载
                 classesPath + "/" + name + ".class"
             };

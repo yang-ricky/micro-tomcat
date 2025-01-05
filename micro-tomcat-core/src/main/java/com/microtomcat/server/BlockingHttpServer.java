@@ -54,11 +54,6 @@ public class BlockingHttpServer extends AbstractHttpServer {
             Context rootContext = new Context("", config.getWebRoot());
             defaultHost.addChild(rootContext);
             
-            Context app1Context = new Context("/app1", config.getWebRoot() + "/app1");
-            Context app2Context = new Context("/app2", config.getWebRoot() + "/app2");
-            defaultHost.addChild(app1Context);
-            defaultHost.addChild(app2Context);
-            
             this.processorPool = new ProcessorPool(
                 100,
                 config.getWebRoot(),
