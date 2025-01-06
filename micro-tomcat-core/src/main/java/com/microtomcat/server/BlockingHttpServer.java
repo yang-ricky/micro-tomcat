@@ -55,11 +55,13 @@ public class BlockingHttpServer extends AbstractHttpServer {
             Context rootContext = new Context("", config.getWebRoot());
             defaultHost.addChild(rootContext);
             
+            this.sessionManager = new SessionManager(engine.getServletContext());
+            
             this.processorPool = new ProcessorPool(
                 100,
                 config.getWebRoot(),
                 engine,
-                new SessionManager(engine.getServletContext())
+                sessionManager
             );
             
             this.connector = new Connector(config.getPort(), processorPool);
