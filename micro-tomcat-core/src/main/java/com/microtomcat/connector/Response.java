@@ -118,12 +118,30 @@ public class Response implements HttpServletResponse {
     // 添加一个用于发送静态资源的方法
     public void sendStaticResource(File resource) throws IOException {
         if (resource.exists()) {
+            // 先设置响应头
+            setStatus(200);
             setContentLength((int) resource.length());
             setContentType(getContentTypeByExtension(resource.getName()));
+            
+            // 写入 HTTP 响应头
+            output.write(("HTTP/1.1 " + status + " " + statusMessage + "\r\n").getBytes());
+            
+            // 写入所有响应头
+            for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+                for (String value : entry.getValue()) {
+                    output.write((entry.getKey() + ": " + value + "\r\n").getBytes());
+                }
+            }
+            
+            // 空行分隔头部和正文
+            output.write("\r\n".getBytes());
+            
+            // 写入文件内容
             Files.copy(resource.toPath(), output);
+            output.flush();
+            committed = true;
         } else {
-            setStatus(404);
-            getWriter().println("404 File Not Found");
+            sendError(404, "File Not Found: " + resource.getName());
         }
     }
 

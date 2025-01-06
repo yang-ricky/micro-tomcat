@@ -13,9 +13,6 @@ public class HelloServlet extends HttpServlet {
     public void service(ServletRequest req, ServletResponse res) 
             throws ServletException, IOException {
         res.setContentType("text/html;charset=UTF-8");
-        res.getWriter().write("HTTP/1.1 200 OK\r\n");
-        res.getWriter().write("Content-Type: text/html;charset=UTF-8\r\n");
-        res.getWriter().write("\r\n");
         res.getWriter().write("<html><body>");
         res.getWriter().write("<h1>Hello from HelloServlet!</h1>");
         res.getWriter().write("</body></html>");
