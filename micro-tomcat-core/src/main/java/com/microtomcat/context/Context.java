@@ -29,20 +29,26 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.microtomcat.context.SimpleServletContext;
+
 public class Context extends ContainerBase {
     private final String docBase;
     private final WebAppClassLoader webAppClassLoader;
-    private final SessionManager sessionManager;
+    private SessionManager sessionManager;
     private Map<String, Servlet> servletMap = new ConcurrentHashMap<>();
+    private ServletContext servletContext;
 
     public Context(String name, String docBase) throws IOException {
         this.name = name;
         this.docBase = docBase;
         
+        // 创建 ServletContext
+        this.servletContext = new SimpleServletContext(getName());
+        
         // 创建分布式会话管理器
         ClusterRegistry clusterRegistry = ClusterRegistry.getInstance();
-        SessionStoreAdapter sessionStore = new InMemoryReplicatedSessionStore(clusterRegistry);
-        this.sessionManager = new DistributedSessionManager(sessionStore);
+        SessionStoreAdapter sessionStore = new InMemoryReplicatedSessionStore(clusterRegistry, this.servletContext);
+        this.sessionManager = new DistributedSessionManager(this.servletContext);
         
         this.webAppClassLoader = ClassLoaderManager.createWebAppClassLoader(docBase);
         
@@ -242,5 +248,25 @@ public class Context extends ContainerBase {
     protected void destroyInternal() throws LifecycleException {
         log("Destroying context: " + name);
         webAppClassLoader.destroy();
+    }
+
+    public ServletContext getServletContext() {
+        if (servletContext == null) {
+            servletContext = new SimpleServletContext(getName());
+        }
+        return servletContext;
+    }
+
+    public String getRealPath(String path) {
+        // 返回 webroot 目录下对应路径的实际文件系统路径
+        return System.getProperty("user.dir") + "/webroot" + path;
+    }
+
+    public void setSessionManager(SessionManager sessionManager) {
+        this.sessionManager = sessionManager;
+        if (this.servletContext != null) {
+            // 确保使用正确的 ServletContext
+            this.sessionManager = new SessionManager(this.servletContext);
+        }
     }
 } 

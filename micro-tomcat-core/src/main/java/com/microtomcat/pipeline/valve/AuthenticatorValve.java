@@ -4,9 +4,10 @@ import com.microtomcat.pipeline.Valve;
 import com.microtomcat.pipeline.ValveContext;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
-import com.microtomcat.session.Session;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import com.microtomcat.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
 
 public class AuthenticatorValve implements Valve {
     @Override
@@ -14,13 +15,15 @@ public class AuthenticatorValve implements Valve {
             throws IOException, ServletException {
         System.out.println("[AuthenticatorValve] Processing request ..");
         
-        // 获取或创建会话
-        Session session = request.getSession(true);
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            Object user = session.getAttribute("user");
+            if (user != null) {
+                context.invokeNext(request, response);
+                return;
+            }
+        }
         
-        // 检查是否需要认证
-        // TODO: 在未来实现更复杂的认证逻辑
-        
-        // 继续处理管道中的下一个阀门
-        context.invokeNext(request, response);
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
     }
 } 

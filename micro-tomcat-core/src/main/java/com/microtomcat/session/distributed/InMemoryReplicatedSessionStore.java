@@ -10,13 +10,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.time.Instant;
 import java.util.Map;
 import java.util.HashMap;
+import com.microtomcat.session.StandardSession;
+import javax.servlet.ServletContext;
 
 public class InMemoryReplicatedSessionStore implements SessionStoreAdapter {
     private final ConcurrentHashMap<String, Session> localSessions = new ConcurrentHashMap<>();
     private final ClusterRegistry clusterRegistry;
+    private final ServletContext servletContext;
     
-    public InMemoryReplicatedSessionStore(ClusterRegistry clusterRegistry) {
+    public InMemoryReplicatedSessionStore(ClusterRegistry clusterRegistry, ServletContext servletContext) {
         this.clusterRegistry = clusterRegistry;
+        this.servletContext = servletContext;
     }
 
     @Override
@@ -176,7 +180,7 @@ public class InMemoryReplicatedSessionStore implements SessionStoreAdapter {
         }
         
         // 创建新的会话
-        Session session = new Session(props.get("id"));
+        StandardSession session = new StandardSession(props.get("id"), servletContext);
         session.setLastAccessedTime(Instant.parse(props.get("lastAccessedTime")));
         session.setMaxInactiveInterval(Integer.parseInt(props.get("maxInactiveInterval")));
         
@@ -195,6 +199,14 @@ public class InMemoryReplicatedSessionStore implements SessionStoreAdapter {
             }
         }
         
+        return session;
+    }
+
+    private Session createSession(String id, Map<String, Object> attributes) {
+        StandardSession session = new StandardSession(id, servletContext);
+        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+            session.setAttribute(entry.getKey(), entry.getValue());
+        }
         return session;
     }
 } 

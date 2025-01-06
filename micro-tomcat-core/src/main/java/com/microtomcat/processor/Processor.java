@@ -29,16 +29,12 @@ import com.microtomcat.container.Host;
 public class Processor extends LifecycleBase {
     private final String webRoot;
     private final Engine engine;
-    private final Pipeline pipeline;
+    private final SessionManager sessionManager;
 
-    public Processor(String webRoot, Engine engine) {
+    public Processor(String webRoot, Engine engine, SessionManager sessionManager) {
         this.webRoot = webRoot;
         this.engine = engine;
-        
-        this.pipeline = new StandardPipeline();
-        pipeline.addValve(new AccessLogValve());
-        pipeline.addValve(new AuthenticatorValve());
-        pipeline.setBasic(new StandardValve(webRoot));
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -66,51 +62,52 @@ public class Processor extends LifecycleBase {
     }
 
     public void process(Socket socket) {
-        try {
-            Request request = new Request(socket.getInputStream(), null);
-            Response response = new Response(socket.getOutputStream());
+        Response response = null;
+        try (InputStream input = socket.getInputStream();
+             OutputStream output = socket.getOutputStream()) {
             
-            try {
-                request.parse();
+            Request request = new Request(input, sessionManager);
+            request.parse();
+            
+            response = new Response(output);
+            
+            // 处理 /ping 请求
+            if ("/ping".equals(request.getUri())) {
+                // 设置响应头和状态
+                response.setContentType("text/plain");
+                response.setContentLength(2);  // "OK" 的长度
+                response.setStatus(200);
                 
-                // 处理 /ping 请求
-                if ("/ping".equals(request.getUri())) {
-                    // 设置响应头和状态
-                    response.setContentType("text/plain");
-                    response.setContentLength(2);  // "OK" 的长度
-                    response.setStatus(200);
-                    
-                    // 获取 writer 会自动写入响应头
-                    PrintWriter writer = response.getWriter();
-                    writer.write("OK");
-                    writer.flush();
-                    return;
-                }
-                
-                if ("/_sessionReplication".equals(request.getUri())) {
-                    handleSessionReplication(request, response);
-                    return;
-                }
-                
-                // 继续原有的处理逻辑
-                engine.invoke(request, response);
-                
-            } catch (Exception e) {
-                log("Error processing request: " + e.getMessage());
+                // 获取 writer 会自动写入响应头
+                PrintWriter writer = response.getWriter();
+                writer.write("OK");
+                writer.flush();
+                return;
+            }
+            
+            if ("/_sessionReplication".equals(request.getUri())) {
+                handleSessionReplication(request, response);
+                return;
+            }
+            
+            // 继续原有的处理逻辑
+            engine.invoke(request, response);
+            
+        } catch (IOException e) {
+            log("Error processing request: " + e.getMessage());
+            if (response != null) {
                 try {
                     response.sendError(500, "Internal Server Error: " + e.getMessage());
-                } catch (IOException ioe) {
-                    log("Failed to send error response: " + ioe.getMessage());
-                }
-            } finally {
-                try {
-                    socket.close(); // 确保socket被关闭
-                } catch (IOException e) {
-                    log("Error closing socket: " + e.getMessage());
+                } catch (IOException ignored) {
+                    // 忽略发送错误响应时的异常
                 }
             }
-        } catch (IOException e) {
-            log("Error creating request/response: " + e.getMessage());
+        } finally {
+            try {
+                socket.close(); // 确保socket被关闭
+            } catch (IOException e) {
+                log("Error closing socket: " + e.getMessage());
+            }
         }
     }
 

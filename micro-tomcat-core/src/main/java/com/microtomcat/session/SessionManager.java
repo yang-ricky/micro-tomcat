@@ -6,19 +6,22 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContext;
 
 public class SessionManager {
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    protected final ServletContext servletContext;
     
-    public SessionManager() {
+    public SessionManager(ServletContext servletContext) {
+        this.servletContext = servletContext;
         // 每分钟检查一次过期的会话
         scheduler.scheduleAtFixedRate(this::cleanExpiredSessions, 1, 1, TimeUnit.MINUTES);
     }
 
     public Session createSession() {
         String sessionId = generateSessionId();
-        Session session = new Session(sessionId);
+        Session session = new StandardSession(sessionId, servletContext);
         sessions.put(sessionId, session);
         return session;
     }

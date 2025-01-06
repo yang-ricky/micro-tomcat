@@ -4,9 +4,12 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
 import java.io.IOException;
+import javax.servlet.ServletContext;
+import com.microtomcat.context.SimpleServletContext;
 
 public class Engine extends ContainerBase {
     private String defaultHost;
+    private ServletContext servletContext;
 
     public Engine(String name, String defaultHost) {
         this.name = name;
@@ -74,5 +77,17 @@ public class Engine extends ContainerBase {
     @Override
     protected void destroyInternal() throws LifecycleException {
         log("Destroying Engine: " + name);
+    }
+
+    public ServletContext getServletContext() {
+        if (servletContext == null) {
+            // 创建一个新的 ServletContext，使用 Engine 名称作为上下文路径
+            servletContext = new SimpleServletContext(getName());
+        }
+        return servletContext;
+    }
+
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
     }
 } 
