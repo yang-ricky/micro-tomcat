@@ -35,6 +35,7 @@ public class BlockingHttpServer extends AbstractHttpServer {
     private final ProcessorPool processorPool;
     private final Connector connector;
     private final Engine engine;
+    private final SessionManager sessionManager;
     private volatile boolean running = true;
     private MBeanRegistry mbeanRegistry;
     private StandardServer serverMBean;
@@ -54,10 +55,13 @@ public class BlockingHttpServer extends AbstractHttpServer {
             Context rootContext = new Context("", config.getWebRoot());
             defaultHost.addChild(rootContext);
             
+            this.sessionManager = new SessionManager(engine.getServletContext());
+            
             this.processorPool = new ProcessorPool(
                 100,
                 config.getWebRoot(),
-                engine
+                engine,
+                sessionManager
             );
             
             this.connector = new Connector(config.getPort(), processorPool);

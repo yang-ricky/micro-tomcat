@@ -6,13 +6,15 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContext;
+import com.microtomcat.session.StandardSession;
 
 public class DistributedSessionManager extends SessionManager {
     private final SessionStoreAdapter sessionStore;
     private final ScheduledExecutorService scheduler;
     
-    public DistributedSessionManager(SessionStoreAdapter sessionStore) {
-        super();
+    public DistributedSessionManager(ServletContext servletContext, SessionStoreAdapter sessionStore) {
+        super(servletContext);
         this.sessionStore = sessionStore;
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         // 每分钟检查过期会话
@@ -22,7 +24,7 @@ public class DistributedSessionManager extends SessionManager {
     @Override
     public Session createSession() {
         String sessionId = generateSessionId();
-        Session session = new Session(sessionId);
+        Session session = new StandardSession(sessionId, servletContext);
         sessionStore.saveSession(session);
         return session;
     }

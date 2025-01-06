@@ -30,6 +30,7 @@ public class ProcessorPool extends LifecycleBase implements ProcessorPoolMBean {
     private final int maxProcessors;
     private final String webRoot;
     private final Engine engine;
+    private final SessionManager sessionManager;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
     private final Condition notFull = lock.newCondition();
@@ -40,10 +41,11 @@ public class ProcessorPool extends LifecycleBase implements ProcessorPoolMBean {
     private final AtomicLong totalRequests = new AtomicLong(0);
     private final ExecutorService executorService;
 
-    public ProcessorPool(int maxProcessors, String webRoot, Engine engine) {
+    public ProcessorPool(int maxProcessors, String webRoot, Engine engine, SessionManager sessionManager) {
         this.maxProcessors = maxProcessors;
         this.webRoot = webRoot;
         this.engine = engine;
+        this.sessionManager = sessionManager;
         this.pool = new ArrayBlockingQueue<>(maxProcessors);
         this.allProcessors = new ArrayList<>();
         
@@ -127,10 +129,11 @@ public class ProcessorPool extends LifecycleBase implements ProcessorPoolMBean {
         }
     }
 
-    private void createProcessor() {
-        Processor processor = new Processor(webRoot, engine);
+    private Processor createProcessor() {
+        Processor processor = new Processor(webRoot, engine, sessionManager);
         allProcessors.add(processor);
         pool.offer(processor);
+        return processor;
     }
 
     public int getActiveCount() {
