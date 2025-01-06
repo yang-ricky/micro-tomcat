@@ -7,7 +7,7 @@ import java.io.File;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.microtomcat.servlet.Servlet;
+import javax.servlet.Servlet;
 import com.microtomcat.servlet.ServletException;
 
 /**
@@ -17,7 +17,7 @@ import com.microtomcat.servlet.ServletException;
 public class WebAppClassLoader extends MicroTomcatClassLoader {
 
     private final String webAppPath;
-    private final Map<String, Servlet> servletCache = new ConcurrentHashMap<>();
+    private final Map<String, javax.servlet.Servlet> servletCache = new ConcurrentHashMap<>();
 
     public WebAppClassLoader(String webAppPath, ClassLoader parent) throws IOException {
         super(new URL[0], parent);
@@ -79,37 +79,39 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
      *   WebAppClassLoader loader = createWebAppClassLoader(...);
      *   Servlet servlet = loader.loadServlet("/servlet/App1Servlet");
      */
-    public Servlet loadServlet(String servletPath) throws ServletException {
+    public javax.servlet.Servlet loadServlet(String servletPath) throws ServletException {
         try {
             if (servletCache.containsKey(servletPath)) {
                 return servletCache.get(servletPath);
             }
 
-            // 例如 /servlet/App1Servlet => "App1Servlet"
+            // 例如 /servlet/HelloServlet => "HelloServlet"
             String servletName = servletPath.substring(servletPath.lastIndexOf("/") + 1);
             Class<?> servletClass;
 
-            // 如果是 rootContext (webroot 对应 path=""),
-            // 那么有可能要加载 WebRootServlet、或者你想把 "HelloServlet" 也放这边？
-            // 不过我们已经在 loadClass() 里对 HelloServlet 做了"交给 parent"的逻辑
-            // 所以这里，如果你想保持旧的com.microtomcat.example.xxx 逻辑，可以这样：
+            // 如果是 rootContext，先尝试 com.microtomcat.example 包
             if (webAppPath.equals("webroot")) {
-                String maybeFullName = "com.microtomcat.example." + servletName;
-                log("Trying to load as: " + maybeFullName);
-                servletClass = loadClass(maybeFullName);
+                try {
+                    String fullClassName = "com.microtomcat.example." + servletName;
+                    log("First trying to load as: " + fullClassName);
+                    servletClass = loadClass(fullClassName);
+                } catch (ClassNotFoundException e) {
+                    // 如果找不到，再尝试直接加载
+                    log("Falling back to load as local class: " + servletName);
+                    servletClass = loadClass(servletName);
+                }
             } else {
-                // 对 /app1、/app2，里面通常就是 "App1Servlet"、"App2Servlet"
-                log("Trying to load as local class: " + servletName);
+                // 对 /app1、/app2 等，直接加载本地类
                 servletClass = loadClass(servletName);
             }
 
             // 判断是否实现了 Servlet 接口
-            if (!Servlet.class.isAssignableFrom(servletClass)) {
+            if (!javax.servlet.Servlet.class.isAssignableFrom(servletClass)) {
                 throw new ServletException("Class " + servletClass.getName() + " is not a Servlet");
             }
 
-            Servlet servlet = (Servlet) servletClass.getDeclaredConstructor().newInstance();
-            servlet.init();
+            javax.servlet.Servlet servlet = (javax.servlet.Servlet) servletClass.getDeclaredConstructor().newInstance();
+            servlet.init(null);
             servletCache.put(servletPath, servlet);
             return servlet;
         } catch (Exception e) {

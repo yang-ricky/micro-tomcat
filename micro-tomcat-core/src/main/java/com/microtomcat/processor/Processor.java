@@ -68,7 +68,7 @@ public class Processor extends LifecycleBase {
     public void process(Socket socket) {
         try {
             Request request = new Request(socket.getInputStream(), null);
-            Response response = new Response(socket.getOutputStream(), request);
+            Response response = new Response(socket.getOutputStream());
             
             try {
                 request.parse();
