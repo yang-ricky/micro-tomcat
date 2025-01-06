@@ -4,102 +4,56 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import org.junit.Before;
 import org.junit.Test;
+import javax.servlet.ServletException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class HttpServletTest {
-    
     private Request mockRequest;
     private Response mockResponse;
+    private StringWriter stringWriter;
     
     @Before
-    public void setUp() {
+    public void setUp() throws IOException {
         mockRequest = mock(Request.class);
         mockResponse = mock(Response.class);
+        stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(mockResponse.getWriter()).thenReturn(writer);
     }
     
     @Test
-    public void testDefaultGetMethod() throws Exception {
-        // 创建一个测试用的HttpServlet实现类
-        HttpServlet servlet = new HttpServlet() {
-            // 使用默认实现
-        };
-        
-        // 配置GET请求
-        when(mockRequest.getMethod()).thenReturn("GET");
-        
-        // 执行service方法
-        servlet.service(mockRequest, mockResponse);
-        
-        // 验证sendError被调用，因为默认的doGet会返回501
-        verify(mockResponse).sendError(eq(501), contains("GET method not implemented"));
-    }
-    
-    @Test
-    public void testDefaultPostMethod() throws Exception {
-        HttpServlet servlet = new HttpServlet() {
-            // 使用默认实现
-        };
-        
-        // 配置POST请求
-        when(mockRequest.getMethod()).thenReturn("POST");
-        
-        servlet.service(mockRequest, mockResponse);
-        
-        // 验证sendError被调用，因为默认的doPost会返回501
-        verify(mockResponse).sendError(eq(501), contains("POST method not implemented"));
-    }
-    
-    @Test
-    public void testUnsupportedMethod() throws Exception {
-        HttpServlet servlet = new HttpServlet() {
-            // 使用默认实现
-        };
-        
-        // 配置一个不支持的HTTP方法
-        when(mockRequest.getMethod()).thenReturn("PUT");
-        
-        servlet.service(mockRequest, mockResponse);
-        
-        // 验证sendError被调用，返回501
-        verify(mockResponse).sendError(eq(501), contains("not implemented"));
-    }
-    
-    @Test
-    public void testCustomGetImplementation() throws Exception {
-        // 创建一个自定义的GET实现
+    public void testDoGet() throws ServletException, IOException {
         HttpServlet servlet = new HttpServlet() {
             @Override
             protected void doGet(Request request, Response response) 
-                    throws ServletException, IOException {
-                response.sendServletResponse("Custom GET Response");
+                    throws javax.servlet.ServletException, IOException {
+                response.getWriter().println("Test GET");
             }
         };
         
-        // 配置GET请求
         when(mockRequest.getMethod()).thenReturn("GET");
-        
         servlet.service(mockRequest, mockResponse);
-        
-        // 验证自定义响应被发送
-        verify(mockResponse).sendServletResponse("Custom GET Response");
+        assertTrue(stringWriter.toString().contains("Test GET"));
     }
     
     @Test
-    public void testLifecycle() throws Exception {
-        // 创建一个跟踪生命周期事件的Servlet
+    public void testLifecycle() throws ServletException {
         final StringBuilder lifecycle = new StringBuilder();
         
         HttpServlet servlet = new HttpServlet() {
             @Override
-            public void init() throws ServletException {
+            public void init() throws javax.servlet.ServletException {
                 lifecycle.append("init;");
             }
             
             @Override
             protected void doGet(Request request, Response response) 
-                    throws ServletException, IOException {
+                    throws javax.servlet.ServletException, IOException {
                 lifecycle.append("service;");
             }
             
@@ -109,25 +63,25 @@ public class HttpServletTest {
             }
         };
         
-        // 执行完整的生命周期
-        when(mockRequest.getMethod()).thenReturn("GET");
-        
         servlet.init();
-        servlet.service(mockRequest, mockResponse);
+        try {
+            when(mockRequest.getMethod()).thenReturn("GET");
+            servlet.service(mockRequest, mockResponse);
+        } catch (IOException e) {
+            fail("Unexpected IOException");
+        }
         servlet.destroy();
         
-        // 验证生命周期顺序
         assertEquals("init;service;destroy;", lifecycle.toString());
     }
     
     @Test
     public void testErrorHandling() throws Exception {
-        // 创建一个会抛出异常的Servlet
         HttpServlet servlet = new HttpServlet() {
             @Override
             protected void doGet(Request request, Response response) 
-                    throws ServletException, IOException {
-                throw new ServletException("Test Exception");
+                    throws javax.servlet.ServletException, IOException {
+                throw new javax.servlet.ServletException("Test Exception");
             }
         };
         

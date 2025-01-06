@@ -1,11 +1,12 @@
 package com.microtomcat.servlet;
 
-import com.microtomcat.connector.Request;
-import com.microtomcat.connector.Response;
-import java.io.IOException;
+import javax.servlet.ServletConfig;
 
-public interface Servlet {
-    void init() throws ServletException;
-    void service(Request request, Response response) throws ServletException, IOException;
-    void destroy();
+@Deprecated
+public interface Servlet extends javax.servlet.Servlet {
+    // 保留无参的init方法用于向后兼容
+    @Deprecated
+    default void init() throws javax.servlet.ServletException {
+        init(null);  // 调用标准的init(ServletConfig)
+    }
 }

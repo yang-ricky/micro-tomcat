@@ -5,6 +5,7 @@ import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import javax.servlet.Servlet;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,18 +49,29 @@ public class ServletLoaderTest {
     public void testLoadServletFromWebRoot() throws Exception {
         // 创建测试Servlet类文件
         String servletCode = 
-            "import com.microtomcat.servlet.Servlet;\n" +
-            "import com.microtomcat.servlet.ServletException;\n" +
-            "import com.microtomcat.connector.Request;\n" +
-            "import com.microtomcat.connector.Response;\n" +
+            "import javax.servlet.*;\n" +
             "import java.io.IOException;\n" +
             "\n" +
             "public class TestServlet implements Servlet {\n" +
-            "    public void init() throws ServletException {}\n" +
-            "    public void service(Request request, Response response) " +
-            "            throws ServletException, IOException {\n" +
-            "        response.getWriter().write(\"Test Response\");\n" +
+            "    private ServletConfig config;\n" +
+            "\n" +
+            "    public void init(ServletConfig config) throws ServletException {\n" +
+            "        this.config = config;\n" +
             "    }\n" +
+            "\n" +
+            "    public ServletConfig getServletConfig() {\n" +
+            "        return config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public void service(ServletRequest req, ServletResponse res) \n" +
+            "            throws ServletException, IOException {\n" +
+            "        res.getWriter().write(\"Test Response\");\n" +
+            "    }\n" +
+            "\n" +
+            "    public String getServletInfo() {\n" +
+            "        return \"Test Servlet\";\n" +
+            "    }\n" +
+            "\n" +
             "    public void destroy() {}\n" +
             "}";
             
@@ -70,25 +82,37 @@ public class ServletLoaderTest {
         compileServlet(servletFile);
         
         // 测试加载
-        Servlet servlet = loader.loadServlet("/servlet/TestServlet");
+        javax.servlet.Servlet servlet = loader.loadServlet("/servlet/TestServlet");
         assertNotNull("Servlet should not be null", servlet);
-        assertTrue("Should be instance of Servlet", servlet instanceof Servlet);
+        assertTrue("Should be instance of Servlet", servlet instanceof javax.servlet.Servlet);
     }
     
     @Test
     public void testLoadServletFromClassesPath() throws Exception {
-        // 在WEB-INF/classes中创建Servlet
         String servletCode = 
-            "import com.microtomcat.servlet.Servlet;\n" +
-            "import com.microtomcat.servlet.ServletException;\n" +
-            "import com.microtomcat.connector.Request;\n" +
-            "import com.microtomcat.connector.Response;\n" +
+            "import javax.servlet.*;\n" +
             "import java.io.IOException;\n" +
             "\n" +
             "public class ClassesServlet implements Servlet {\n" +
-            "    public void init() throws ServletException {}\n" +
-            "    public void service(Request request, Response response) " +
-            "            throws ServletException, IOException {}\n" +
+            "    private ServletConfig config;\n" +
+            "\n" +
+            "    public void init(ServletConfig config) throws ServletException {\n" +
+            "        this.config = config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public ServletConfig getServletConfig() {\n" +
+            "        return config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public void service(ServletRequest req, ServletResponse res) \n" +
+            "            throws ServletException, IOException {\n" +
+            "        res.getWriter().write(\"Test Response\");\n" +
+            "    }\n" +
+            "\n" +
+            "    public String getServletInfo() {\n" +
+            "        return \"Test Servlet\";\n" +
+            "    }\n" +
+            "\n" +
             "    public void destroy() {}\n" +
             "}";
             
@@ -97,24 +121,38 @@ public class ServletLoaderTest {
         
         compileServlet(servletFile);
         
-        Servlet servlet = loader.loadServlet("/servlet/ClassesServlet");
+        // 测试加载
+        javax.servlet.Servlet servlet = loader.loadServlet("/servlet/ClassesServlet");
         assertNotNull("Servlet should not be null", servlet);
+        assertTrue("Should be instance of Servlet", servlet instanceof javax.servlet.Servlet);
     }
     
     @Test
     public void testServletCache() throws Exception {
-        // 创建测试Servlet
         String servletCode = 
-            "import com.microtomcat.servlet.Servlet;\n" +
-            "import com.microtomcat.servlet.ServletException;\n" +
-            "import com.microtomcat.connector.Request;\n" +
-            "import com.microtomcat.connector.Response;\n" +
+            "import javax.servlet.*;\n" +
             "import java.io.IOException;\n" +
             "\n" +
             "public class CachedServlet implements Servlet {\n" +
-            "    public void init() throws ServletException {}\n" +
-            "    public void service(Request request, Response response) " +
-            "            throws ServletException, IOException {}\n" +
+            "    private ServletConfig config;\n" +
+            "\n" +
+            "    public void init(ServletConfig config) throws ServletException {\n" +
+            "        this.config = config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public ServletConfig getServletConfig() {\n" +
+            "        return config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public void service(ServletRequest req, ServletResponse res) \n" +
+            "            throws ServletException, IOException {\n" +
+            "        res.getWriter().write(\"Cached Response\");\n" +
+            "    }\n" +
+            "\n" +
+            "    public String getServletInfo() {\n" +
+            "        return \"Cached Servlet\";\n" +
+            "    }\n" +
+            "\n" +
             "    public void destroy() {}\n" +
             "}";
             
@@ -124,8 +162,8 @@ public class ServletLoaderTest {
         compileServlet(servletFile);
         
         // 加载同一个Servlet两次，应该返回相同实例
-        Servlet servlet1 = loader.loadServlet("/servlet/CachedServlet");
-        Servlet servlet2 = loader.loadServlet("/servlet/CachedServlet");
+        javax.servlet.Servlet servlet1 = loader.loadServlet("/servlet/CachedServlet");
+        javax.servlet.Servlet servlet2 = loader.loadServlet("/servlet/CachedServlet");
         
         assertSame("Should return cached instance", servlet1, servlet2);
     }
@@ -133,8 +171,16 @@ public class ServletLoaderTest {
     private void compileServlet(File sourceFile) throws IOException {
         // 使用JavaCompiler编译Servlet
         javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+        
+        // 添加所有必要的classpath
+        String classpath = System.getProperty("java.class.path") + 
+                          File.pathSeparator + 
+                          new File("target/classes").getAbsolutePath() +
+                          File.pathSeparator + 
+                          new File("target/test-classes").getAbsolutePath();
+        
         int result = compiler.run(null, null, null, 
-            "-cp", System.getProperty("java.class.path"),
+            "-cp", classpath,
             "-d", classesPath.getAbsolutePath(),
             sourceFile.getPath());
             

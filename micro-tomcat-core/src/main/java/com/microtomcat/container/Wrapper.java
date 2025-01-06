@@ -3,19 +3,18 @@ package com.microtomcat.container;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.servlet.Servlet;
-import com.microtomcat.servlet.ServletException;
 import com.microtomcat.context.Context;
+import com.microtomcat.connector.ServletRequestWrapper;
+import com.microtomcat.connector.ServletResponseWrapper;
+import javax.servlet.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.Filter;
-import javax.servlet.ServletRequestListener;
 
 public class Wrapper extends ContainerBase {
-    private Servlet servlet;
+    private javax.servlet.Servlet servlet;
     private final String servletClass;
     private Map<String, String> initParameters = new HashMap<>();
     private List<Filter> filterChain = new ArrayList<>();
@@ -26,7 +25,7 @@ public class Wrapper extends ContainerBase {
         this.servletClass = servletClass;
     }
 
-    public void setServlet(Servlet servlet) {
+    public void setServlet(javax.servlet.Servlet servlet) {
         this.servlet = servlet;
     }
 
@@ -36,37 +35,59 @@ public class Wrapper extends ContainerBase {
             Context context = (Context) getParent();
             Class<?> servletClass;
             
-            // 1. 如果是框架提供的 Servlet (com.microtomcat.example.*)，用系统类加载器
             if (this.servletClass.startsWith("com.microtomcat.")) {
                 ClassLoader loader = getParent().getClass().getClassLoader();
-                log("For servlet in target/classes, loading servlet class: " + this.servletClass + " using loader: " + loader);
                 servletClass = loader.loadClass(this.servletClass);
-            } 
-            // 2. 如果是应用的 Servlet，用对应的 WebAppClassLoader
-            else {
+            } else {
                 ClassLoader loader = context.getWebAppClassLoader();
-                log("For servlet in webroot, loading servlet class: " + this.servletClass + " using loader: " + loader);
                 servletClass = loader.loadClass(this.servletClass);
             }
 
-            // 确保它实现了 Servlet 接口
-            if (!com.microtomcat.servlet.Servlet.class.isAssignableFrom(servletClass)) {
+            // 检查是否实现了标准Servlet接口
+            if (!javax.servlet.Servlet.class.isAssignableFrom(servletClass)) {
                 throw new LifecycleException("Class " + servletClass + " is not a Servlet");
             }
             
-            servlet = (com.microtomcat.servlet.Servlet) servletClass.getDeclaredConstructor().newInstance();
-            servlet.init();
+            servlet = (javax.servlet.Servlet) servletClass.getDeclaredConstructor().newInstance();
+            servlet.init(createServletConfig());
             
         } catch (Exception e) {
             throw new LifecycleException("Failed to initialize servlet: " + name, e);
         }
     }
 
+    private javax.servlet.ServletConfig createServletConfig() {
+        return new javax.servlet.ServletConfig() {
+            @Override
+            public String getServletName() {
+                return name;
+            }
+
+            @Override
+            public javax.servlet.ServletContext getServletContext() {
+                return null; // TODO: 实现ServletContext
+            }
+
+            @Override
+            public String getInitParameter(String name) {
+                return initParameters.get(name);
+            }
+
+            @Override
+            public java.util.Enumeration<String> getInitParameterNames() {
+                return java.util.Collections.enumeration(initParameters.keySet());
+            }
+        };
+    }
+
     @Override
     public void invoke(Request request, Response response) {
         try {
             if (servlet != null) {
-                servlet.service(request, response);
+                // 使用包装器将我们的 Request/Response 转换为标准的 ServletRequest/ServletResponse
+                ServletRequest servletRequest = new ServletRequestWrapper(request);
+                ServletResponse servletResponse = new ServletResponseWrapper(response);
+                servlet.service(servletRequest, servletResponse);
             } else {
                 throw new ServletException("No servlet instance available");
             }

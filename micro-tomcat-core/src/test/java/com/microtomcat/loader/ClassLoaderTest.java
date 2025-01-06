@@ -98,18 +98,29 @@ public class ClassLoaderTest {
     public void testLoadServletClass() throws Exception {
         // 创建一个测试 Servlet 类
         String servletCode = 
-            "import com.microtomcat.servlet.Servlet;\n" +
-            "import com.microtomcat.servlet.ServletException;\n" +
-            "import com.microtomcat.connector.Request;\n" +
-            "import com.microtomcat.connector.Response;\n" +
+            "import javax.servlet.*;\n" +
             "import java.io.IOException;\n" +
             "\n" +
             "public class TestServlet implements Servlet {\n" +
-            "    public void init() throws ServletException {}\n" +
-            "    public void service(Request request, Response response) " +
-            "            throws ServletException, IOException {\n" +
-            "        response.getWriter().write(\"Test Servlet Response\");\n" +
+            "    private ServletConfig config;\n" +
+            "\n" +
+            "    public void init(ServletConfig config) throws ServletException {\n" +
+            "        this.config = config;\n" +
             "    }\n" +
+            "\n" +
+            "    public ServletConfig getServletConfig() {\n" +
+            "        return config;\n" +
+            "    }\n" +
+            "\n" +
+            "    public void service(ServletRequest req, ServletResponse res) \n" +
+            "            throws ServletException, IOException {\n" +
+            "        res.getWriter().write(\"Test Response\");\n" +
+            "    }\n" +
+            "\n" +
+            "    public String getServletInfo() {\n" +
+            "        return \"Test Servlet\";\n" +
+            "    }\n" +
+            "\n" +
             "    public void destroy() {}\n" +
             "}";
         
@@ -129,8 +140,7 @@ public class ClassLoaderTest {
         
         assertNotNull("Servlet class should not be null", servletClass);
         assertTrue("Class should implement Servlet interface",
-                  Arrays.asList(servletClass.getInterfaces())
-                        .contains(com.microtomcat.servlet.Servlet.class));
+                  javax.servlet.Servlet.class.isAssignableFrom(servletClass));
     }
     
     @After

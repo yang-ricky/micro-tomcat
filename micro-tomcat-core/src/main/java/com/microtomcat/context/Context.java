@@ -82,6 +82,12 @@ public class Context extends ContainerBase {
 
     public void addServlet(String name, Servlet servlet) {
         servletMap.put(name, servlet);
+        
+        // 创建并添加对应的 Wrapper
+        Wrapper wrapper = new Wrapper(name, servlet.getClass().getName());
+        wrapper.setServlet(servlet);  // 直接设置已存在的servlet实例
+        addChild(wrapper);  // 添加到子容器中
+        
         try {
             // 创建一个简单的 ServletConfig 实现
             ServletConfig config = new ServletConfig() {
