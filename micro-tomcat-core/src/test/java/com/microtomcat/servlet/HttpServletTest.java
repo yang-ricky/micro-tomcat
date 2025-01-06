@@ -4,7 +4,10 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import org.junit.Before;
 import org.junit.Test;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -13,14 +16,17 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class HttpServletTest {
-    private Request mockRequest;
-    private Response mockResponse;
+    private HttpServletRequest mockRequest;
+    private HttpServletResponse mockResponse;
     private StringWriter stringWriter;
     
     @Before
     public void setUp() throws IOException {
-        mockRequest = mock(Request.class);
-        mockResponse = mock(Response.class);
+        // 直接mock HTTP接口
+        mockRequest = mock(HttpServletRequest.class);
+        mockResponse = mock(HttpServletResponse.class);
+        
+        // 设置 writer
         stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);
         when(mockResponse.getWriter()).thenReturn(writer);
@@ -30,8 +36,8 @@ public class HttpServletTest {
     public void testDoGet() throws ServletException, IOException {
         HttpServlet servlet = new HttpServlet() {
             @Override
-            protected void doGet(Request request, Response response) 
-                    throws javax.servlet.ServletException, IOException {
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+                    throws ServletException, IOException {
                 response.getWriter().println("Test GET");
             }
         };
@@ -47,13 +53,13 @@ public class HttpServletTest {
         
         HttpServlet servlet = new HttpServlet() {
             @Override
-            public void init() throws javax.servlet.ServletException {
+            public void init() throws ServletException {
                 lifecycle.append("init;");
             }
             
             @Override
-            protected void doGet(Request request, Response response) 
-                    throws javax.servlet.ServletException, IOException {
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+                    throws ServletException, IOException {
                 lifecycle.append("service;");
             }
             
@@ -79,9 +85,9 @@ public class HttpServletTest {
     public void testErrorHandling() throws Exception {
         HttpServlet servlet = new HttpServlet() {
             @Override
-            protected void doGet(Request request, Response response) 
-                    throws javax.servlet.ServletException, IOException {
-                throw new javax.servlet.ServletException("Test Exception");
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+                    throws ServletException, IOException {
+                throw new ServletException("Test Exception");
             }
         };
         

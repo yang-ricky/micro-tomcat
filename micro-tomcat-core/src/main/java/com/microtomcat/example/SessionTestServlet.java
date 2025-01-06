@@ -1,17 +1,17 @@
 package com.microtomcat.example;
 
-import com.microtomcat.connector.Request;
-import com.microtomcat.connector.Response;
-import com.microtomcat.servlet.HttpServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.servlet.ServletException;
 import java.io.IOException;
-import com.microtomcat.session.Session;
 
 public class SessionTestServlet extends HttpServlet {
     @Override
-    protected void doGet(Request request, Response response)
-            throws javax.servlet.ServletException, IOException {
-        Session session = request.getSession(true);
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        HttpSession session = request.getSession(true);
         Integer count = (Integer) session.getAttribute("count");
         if (count == null) {
             count = 1;
