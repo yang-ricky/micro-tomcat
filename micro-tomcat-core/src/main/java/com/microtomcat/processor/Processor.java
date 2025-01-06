@@ -75,7 +75,15 @@ public class Processor extends LifecycleBase {
                 
                 // 处理 /ping 请求
                 if ("/ping".equals(request.getUri())) {
-                    response.sendError(200, "OK");
+                    // 设置响应头和状态
+                    response.setContentType("text/plain");
+                    response.setContentLength(2);  // "OK" 的长度
+                    response.setStatus(200);
+                    
+                    // 获取 writer 会自动写入响应头
+                    PrintWriter writer = response.getWriter();
+                    writer.write("OK");
+                    writer.flush();
                     return;
                 }
                 

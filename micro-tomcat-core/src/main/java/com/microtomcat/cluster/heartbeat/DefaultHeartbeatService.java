@@ -8,6 +8,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.net.Socket;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class DefaultHeartbeatService implements HeartbeatService {
     private static final Logger logger = Logger.getLogger(DefaultHeartbeatService.class.getName());
@@ -99,9 +103,31 @@ public class DefaultHeartbeatService implements HeartbeatService {
     }
 
     private boolean ping(ClusterNode node) {
-        // 实现ping逻辑，例如HTTP请求node的/ping接口
-        // 这里简单返回true，实际实现需要真正去ping目标节点
-        return true;
+        try {
+            // 创建到目标节点的 Socket 连接
+            Socket socket = new Socket(node.getHost(), node.getPort());
+            
+            // 发送 HTTP GET 请求
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println("GET /ping HTTP/1.1");
+            out.println("Host: " + node.getHost() + ":" + node.getPort());
+            out.println("Connection: close");
+            out.println(); // 空行表示请求头结束
+            
+            // 读取响应
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String responseLine = in.readLine();
+            
+            // 关闭连接
+            socket.close();
+            
+            // 检查响应状态码是否为 200
+            return responseLine != null && responseLine.contains("200 OK");
+            
+        } catch (Exception e) {
+            logger.warning("[HeartbeatService] Failed to ping node " + node.getId() + ": " + e.getMessage());
+            return false;
+        }
     }
 
     private boolean isCurrentNode(ClusterNode node) {
