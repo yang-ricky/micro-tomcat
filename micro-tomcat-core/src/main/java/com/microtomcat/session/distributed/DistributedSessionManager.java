@@ -13,7 +13,7 @@ public class DistributedSessionManager extends SessionManager {
     private final SessionStoreAdapter sessionStore;
     private final ScheduledExecutorService scheduler;
     
-    public DistributedSessionManager(ServletContext servletContext) {
+    public DistributedSessionManager(ServletContext servletContext, SessionStoreAdapter sessionStore) {
         super(servletContext);
         this.sessionStore = sessionStore;
         this.scheduler = Executors.newSingleThreadScheduledExecutor();

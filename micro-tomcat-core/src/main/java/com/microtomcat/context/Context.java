@@ -16,6 +16,7 @@ import com.microtomcat.loader.ClassLoaderManager;
 import com.microtomcat.session.distributed.DistributedSessionManager;
 import com.microtomcat.session.distributed.InMemoryReplicatedSessionStore;
 import com.microtomcat.session.distributed.SessionStoreAdapter;
+import com.microtomcat.session.distributed.InMemorySessionStoreAdapter;
 
 // 添加 Servlet API 相关导入
 import javax.servlet.Servlet;
@@ -37,6 +38,7 @@ public class Context extends ContainerBase {
     private SessionManager sessionManager;
     private Map<String, Servlet> servletMap = new ConcurrentHashMap<>();
     private ServletContext servletContext;
+    private final SessionStoreAdapter sessionStore = new InMemorySessionStoreAdapter();
 
     public Context(String name, String docBase) throws IOException {
         this.name = name;
@@ -48,7 +50,7 @@ public class Context extends ContainerBase {
         // 创建分布式会话管理器
         ClusterRegistry clusterRegistry = ClusterRegistry.getInstance();
         SessionStoreAdapter sessionStore = new InMemoryReplicatedSessionStore(clusterRegistry, this.servletContext);
-        this.sessionManager = new DistributedSessionManager(this.servletContext);
+        this.sessionManager = new DistributedSessionManager(this.servletContext, sessionStore);
         
         this.webAppClassLoader = ClassLoaderManager.createWebAppClassLoader(docBase);
         

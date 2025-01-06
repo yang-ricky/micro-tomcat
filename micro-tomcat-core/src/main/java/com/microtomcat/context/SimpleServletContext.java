@@ -277,4 +277,9 @@ public class SimpleServletContext implements ServletContext {
     public int getSessionTimeout() {
         return sessionTimeout;
     }
+
+    @Override
+    public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
+        throw new UnsupportedOperationException("JSP support is not implemented");
+    }
 } 
