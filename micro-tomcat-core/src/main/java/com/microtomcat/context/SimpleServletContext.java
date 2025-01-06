@@ -282,4 +282,44 @@ public class SimpleServletContext implements ServletContext {
     public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
         throw new UnsupportedOperationException("JSP support is not implemented");
     }
+
+    @Override
+    public void log(Exception exception, String msg) {
+        log(msg, exception);
+    }
+
+    @Override
+    public Enumeration<String> getServletNames() {
+        return Collections.emptyEnumeration();
+    }
+
+    @Override
+    public Enumeration<Servlet> getServlets() {
+        return Collections.emptyEnumeration();
+    }
+
+    @Override
+    public Servlet getServlet(String name) {
+        return null;  // 这是一个已废弃的方法，返回 null 即可
+    }
+
+    @Override
+    public int getEffectiveMinorVersion() {
+        return 0;  // 返回最基本的版本号
+    }
+
+    @Override
+    public int getMajorVersion() {
+        return 4;  // Servlet 4.0
+    }
+
+    @Override
+    public int getMinorVersion() {
+        return 0;
+    }
+
+    @Override
+    public int getEffectiveMajorVersion() {
+        return getMajorVersion();
+    }
 } 
