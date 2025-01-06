@@ -9,6 +9,7 @@ import javax.servlet.Servlet;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import static org.junit.Assert.*;
 
@@ -29,12 +30,11 @@ public class ServletLoaderTest {
         classesPath = new File(webInf, "classes");
         classesPath.mkdirs();
         
-        // 添加项目target/classes到classpath，确保能找到基础类
+        // 添加项目target/classes到classpath
         String targetClasses = new File("target/classes").getAbsolutePath();
         System.setProperty("java.class.path", 
             System.getProperty("java.class.path") + File.pathSeparator + targetClasses);
         
-        // 创建ServletLoader实例
         loader = new ServletLoader(webRoot.getAbsolutePath(), classesPath.getAbsolutePath());
     }
     
@@ -47,41 +47,8 @@ public class ServletLoaderTest {
     
     @Test
     public void testLoadServletFromWebRoot() throws Exception {
-        // 创建测试Servlet类文件
-        String servletCode = 
-            "import javax.servlet.*;\n" +
-            "import java.io.IOException;\n" +
-            "\n" +
-            "public class TestServlet implements Servlet {\n" +
-            "    private ServletConfig config;\n" +
-            "\n" +
-            "    public void init(ServletConfig config) throws ServletException {\n" +
-            "        this.config = config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public ServletConfig getServletConfig() {\n" +
-            "        return config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public void service(ServletRequest req, ServletResponse res) \n" +
-            "            throws ServletException, IOException {\n" +
-            "        res.getWriter().write(\"Test Response\");\n" +
-            "    }\n" +
-            "\n" +
-            "    public String getServletInfo() {\n" +
-            "        return \"Test Servlet\";\n" +
-            "    }\n" +
-            "\n" +
-            "    public void destroy() {}\n" +
-            "}";
-            
-        File servletFile = new File(classesPath, "TestServlet.java");
-        Files.write(servletFile.toPath(), servletCode.getBytes());
+        copyAndCompileServlet("TestServlet.java");
         
-        // 编译Servlet
-        compileServlet(servletFile);
-        
-        // 测试加载
         javax.servlet.Servlet servlet = loader.loadServlet("/servlet/TestServlet");
         assertNotNull("Servlet should not be null", servlet);
         assertTrue("Should be instance of Servlet", servlet instanceof javax.servlet.Servlet);
@@ -89,39 +56,8 @@ public class ServletLoaderTest {
     
     @Test
     public void testLoadServletFromClassesPath() throws Exception {
-        String servletCode = 
-            "import javax.servlet.*;\n" +
-            "import java.io.IOException;\n" +
-            "\n" +
-            "public class ClassesServlet implements Servlet {\n" +
-            "    private ServletConfig config;\n" +
-            "\n" +
-            "    public void init(ServletConfig config) throws ServletException {\n" +
-            "        this.config = config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public ServletConfig getServletConfig() {\n" +
-            "        return config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public void service(ServletRequest req, ServletResponse res) \n" +
-            "            throws ServletException, IOException {\n" +
-            "        res.getWriter().write(\"Test Response\");\n" +
-            "    }\n" +
-            "\n" +
-            "    public String getServletInfo() {\n" +
-            "        return \"Test Servlet\";\n" +
-            "    }\n" +
-            "\n" +
-            "    public void destroy() {}\n" +
-            "}";
-            
-        File servletFile = new File(classesPath, "ClassesServlet.java");
-        Files.write(servletFile.toPath(), servletCode.getBytes());
+        copyAndCompileServlet("ClassesServlet.java");
         
-        compileServlet(servletFile);
-        
-        // 测试加载
         javax.servlet.Servlet servlet = loader.loadServlet("/servlet/ClassesServlet");
         assertNotNull("Servlet should not be null", servlet);
         assertTrue("Should be instance of Servlet", servlet instanceof javax.servlet.Servlet);
@@ -129,50 +65,26 @@ public class ServletLoaderTest {
     
     @Test
     public void testServletCache() throws Exception {
-        String servletCode = 
-            "import javax.servlet.*;\n" +
-            "import java.io.IOException;\n" +
-            "\n" +
-            "public class CachedServlet implements Servlet {\n" +
-            "    private ServletConfig config;\n" +
-            "\n" +
-            "    public void init(ServletConfig config) throws ServletException {\n" +
-            "        this.config = config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public ServletConfig getServletConfig() {\n" +
-            "        return config;\n" +
-            "    }\n" +
-            "\n" +
-            "    public void service(ServletRequest req, ServletResponse res) \n" +
-            "            throws ServletException, IOException {\n" +
-            "        res.getWriter().write(\"Cached Response\");\n" +
-            "    }\n" +
-            "\n" +
-            "    public String getServletInfo() {\n" +
-            "        return \"Cached Servlet\";\n" +
-            "    }\n" +
-            "\n" +
-            "    public void destroy() {}\n" +
-            "}";
-            
-        File servletFile = new File(classesPath, "CachedServlet.java");
-        Files.write(servletFile.toPath(), servletCode.getBytes());
+        copyAndCompileServlet("CachedServlet.java");
         
-        compileServlet(servletFile);
-        
-        // 加载同一个Servlet两次，应该返回相同实例
         javax.servlet.Servlet servlet1 = loader.loadServlet("/servlet/CachedServlet");
         javax.servlet.Servlet servlet2 = loader.loadServlet("/servlet/CachedServlet");
         
         assertSame("Should return cached instance", servlet1, servlet2);
     }
     
+    private void copyAndCompileServlet(String servletFileName) throws IOException {
+        // 从资源文件复制Servlet源码
+        try (InputStream in = getClass().getResourceAsStream("/servlets/" + servletFileName)) {
+            File servletFile = new File(classesPath, servletFileName);
+            Files.copy(in, servletFile.toPath());
+            compileServlet(servletFile);
+        }
+    }
+    
     private void compileServlet(File sourceFile) throws IOException {
-        // 使用JavaCompiler编译Servlet
         javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
         
-        // 添加所有必要的classpath
         String classpath = System.getProperty("java.class.path") + 
                           File.pathSeparator + 
                           new File("target/classes").getAbsolutePath() +
