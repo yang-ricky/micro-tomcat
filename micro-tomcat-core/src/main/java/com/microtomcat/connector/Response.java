@@ -4,11 +4,15 @@ import java.io.*;
 import java.util.*;
 import javax.servlet.*;
 import javax.servlet.http.*;
+import java.text.SimpleDateFormat;
+import java.util.TimeZone;
+import java.util.Locale;
+import java.nio.charset.StandardCharsets;
 
 public class Response implements HttpServletResponse {
     private final OutputStream output;
     private final PrintWriter writer;
-    private final Map<String, String> headers = new HashMap<>();
+    private final Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final List<Cookie> cookies = new ArrayList<>();
     private String contentType;
     private String characterEncoding = "UTF-8";
@@ -17,12 +21,34 @@ public class Response implements HttpServletResponse {
     private boolean committed = false;
     private String errorMessage;
     private Locale locale = Locale.getDefault();
-    private int bufferSize = 8192;  // 默认缓冲区大小为8KB
+    private int bufferSize = 8192;
     private ServletOutputStream servletOutputStream;
+    private ByteArrayOutputStream buffer;
 
     public Response(OutputStream output) {
         this.output = output;
-        this.writer = new PrintWriter(new OutputStreamWriter(output));
+        this.buffer = new ByteArrayOutputStream(bufferSize);
+        this.writer = new PrintWriter(new OutputStreamWriter(buffer, StandardCharsets.UTF_8));
+        this.servletOutputStream = new ServletOutputStream() {
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setWriteListener(WriteListener writeListener) {
+            }
+
+            @Override
+            public void write(int b) throws IOException {
+                buffer.write(b);
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+                buffer.write(b, off, len);
+            }
+        };
     }
 
     @Override
@@ -33,8 +59,14 @@ public class Response implements HttpServletResponse {
     @Override
     public void setContentType(String type) {
         this.contentType = type;
-        if (!committed) {
-            headers.put("Content-Type", type);
+        if (!committed && type != null) {
+            if (!type.contains("charset=") && getCharacterEncoding() != null) {
+                headers.put("Content-Type", type + "; charset=" + getCharacterEncoding());
+                System.out.println("Response DEBUG: Setting Content-Type header: " + type + "; charset=" + getCharacterEncoding());
+            } else {
+                headers.put("Content-Type", type);
+                System.out.println("Response DEBUG: Setting Content-Type header: " + type);
+            }
         }
     }
 
@@ -64,19 +96,26 @@ public class Response implements HttpServletResponse {
     @Override
     public void setHeader(String name, String value) {
         if (!committed) {
-            headers.put(name.toLowerCase(), value);
+            headers.put(name, value);
+            System.out.println("Response DEBUG: Setting header: " + name + " = " + value);
         }
     }
 
     @Override
     public PrintWriter getWriter() throws IOException {
+        if (!committed) {
+            sendHeaders();
+        }
         return writer;
     }
 
     @Override
     public void setContentLength(int len) {
-        this.contentLength = len;
-        setHeader("Content-Length", String.valueOf(len));
+        if (!isCommitted()) {
+            this.contentLength = len;
+            headers.put("Content-Length", String.valueOf(len));
+            System.out.println("Response DEBUG: Setting Content-Length: " + len);
+        }
     }
 
     @Override
@@ -120,7 +159,14 @@ public class Response implements HttpServletResponse {
         if (resource.exists()) {
             try (FileInputStream fis = new FileInputStream(resource)) {
                 setContentLength((int) resource.length());
-                setContentType(getContentTypeFromFileName(resource.getName()));
+                String contentType = getContentTypeFromFileName(resource.getName());
+                System.out.println("Response DEBUG: Setting Content-Type for static resource: " + contentType);
+                setContentType(contentType);
+                
+                // 确保发送响应头
+                sendHeaders();
+                
+                // 再发送内容
                 byte[] buffer = new byte[1024];
                 int bytesRead;
                 while ((bytesRead = fis.read(buffer)) != -1) {
@@ -135,12 +181,26 @@ public class Response implements HttpServletResponse {
     }
 
     private String getContentTypeFromFileName(String fileName) {
-        if (fileName.endsWith(".html")) return "text/html";
-        if (fileName.endsWith(".css")) return "text/css";
-        if (fileName.endsWith(".js")) return "application/javascript";
-        if (fileName.endsWith(".png")) return "image/png";
-        if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) return "image/jpeg";
-        return "text/plain";
+        String contentType;
+        if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+            contentType = "text/html";
+        } else if (fileName.endsWith(".txt")) {
+            contentType = "text/plain";
+        } else if (fileName.endsWith(".css")) {
+            contentType = "text/css";
+        } else if (fileName.endsWith(".js")) {
+            contentType = "application/javascript";
+        } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+            contentType = "image/jpeg";
+        } else if (fileName.endsWith(".png")) {
+            contentType = "image/png";
+        } else if (fileName.endsWith(".gif")) {
+            contentType = "image/gif";
+        } else {
+            contentType = "application/octet-stream";
+        }
+        System.out.println("DEBUG: getContentTypeFromFileName: " + fileName + " -> " + contentType);
+        return contentType;
     }
 
     @Override
@@ -163,6 +223,18 @@ public class Response implements HttpServletResponse {
 
     @Override
     public void flushBuffer() throws IOException {
+        // 确保响应头已发送
+        if (!committed) {
+            sendHeaders();
+        }
+        
+        // 刷新缓冲区内容
+        if (buffer.size() > 0) {
+            buffer.writeTo(output);
+            buffer.reset();
+        }
+        
+        // 刷新输出流
         writer.flush();
         output.flush();
         committed = true;
@@ -330,35 +402,78 @@ public class Response implements HttpServletResponse {
 
     @Override
     public void setContentLengthLong(long length) {
-        if (isCommitted()) {
-            return;
+        if (!isCommitted()) {
+            this.contentLength = (int) length;
+            headers.put("Content-Length", String.valueOf(length));
+            System.out.println("Response DEBUG: Setting Content-Length (long): " + length);
         }
-        setHeader("Content-Length", String.valueOf(length));
     }
 
     @Override
     public ServletOutputStream getOutputStream() throws IOException {
-        if (writer != null && writer.checkError()) {
-            throw new IllegalStateException("PrintWriter has already been obtained");
-        }
-        if (servletOutputStream == null) {
-            servletOutputStream = new ServletOutputStream() {
-                @Override
-                public void write(int b) throws IOException {
-                    output.write(b);
-                }
-
-                @Override
-                public boolean isReady() {
-                    return true;
-                }
-
-                @Override
-                public void setWriteListener(WriteListener writeListener) {
-                    throw new UnsupportedOperationException("Write listeners are not supported");
-                }
-            };
+        if (!committed) {
+            sendHeaders();
         }
         return servletOutputStream;
+    }
+
+    public void sendHeaders() throws IOException {
+        if (!isCommitted()) {
+            // 1. 写入状态行
+            String statusLine = String.format("HTTP/1.1 %d %s\r\n", status, getStatusMessage(status));
+            output.write(statusLine.getBytes(StandardCharsets.ISO_8859_1));
+            
+            // 2. 确保基本响应头存在
+            setHeader("Server", "MicroTomcat");
+            
+            // 设置 Content-Type
+            if (contentType != null) {
+                if (!contentType.contains("charset=") && getCharacterEncoding() != null) {
+                    setHeader("Content-Type", contentType + "; charset=" + getCharacterEncoding());
+                } else {
+                    setHeader("Content-Type", contentType);
+                }
+            }
+            
+            // 3. 写入所有响应头
+            for (Map.Entry<String, String> header : headers.entrySet()) {
+                String headerLine = String.format("%s: %s\r\n", header.getKey(), header.getValue());
+                System.out.println("Response DEBUG: Writing header: " + headerLine.trim());
+                output.write(headerLine.getBytes(StandardCharsets.ISO_8859_1));
+            }
+            
+            // 4. 写入空行
+            output.write("\r\n".getBytes(StandardCharsets.ISO_8859_1));
+            
+            // 5. 写入缓冲区内容（如果有的话）
+            if (buffer.size() > 0) {
+                buffer.writeTo(output);
+                buffer.reset();
+            }
+            
+            // 6. 刷新输出流
+            output.flush();
+            
+            committed = true;
+        }
+    }
+
+    private String getStatusMessage(int status) {
+        switch (status) {
+            case 200: return "OK";
+            case 404: return "Not Found";
+            case 500: return "Internal Server Error";
+            default: return "Unknown";
+        }
+    }
+
+    public int getContentLength() {
+        return contentLength;
+    }
+
+    private void ensureHeadersSent() throws IOException {
+        if (!committed) {
+            sendHeaders();
+        }
     }
 }

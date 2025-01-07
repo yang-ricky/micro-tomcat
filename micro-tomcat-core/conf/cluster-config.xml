@@ -4,7 +4,7 @@
     <heartbeatTimeout>3000</heartbeatTimeout>
     <nodes>
         <node name="node1" host="localhost" port="8080"/>
-        <node name="node2" host="localhost" port="8081"/>
-        <node name="node3" host="localhost" port="8082"/>
+        <!-- <node name="node2" host="localhost" port="8081"/>
+        <node name="node3" host="localhost" port="8082"/> -->
     </nodes>
 </cluster> 

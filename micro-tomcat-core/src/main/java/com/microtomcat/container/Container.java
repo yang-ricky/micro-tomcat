@@ -1,5 +1,6 @@
 package com.microtomcat.container;
 
+import com.microtomcat.loader.WebAppClassLoader;
 import com.microtomcat.lifecycle.Lifecycle;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
@@ -20,4 +21,6 @@ public interface Container extends Lifecycle {
     public void removeChild(Container child);
     
     public void invoke(Request request, Response response);
+    
+    public WebAppClassLoader getWebAppClassLoader();
 } 

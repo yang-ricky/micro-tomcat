@@ -9,137 +9,143 @@ import com.microtomcat.connector.ServletResponseWrapper;
 import javax.servlet.*;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class Wrapper extends ContainerBase {
-    private javax.servlet.Servlet servlet;
     private final String servletClass;
-    private Map<String, String> initParameters = new HashMap<>();
-    private List<Filter> filterChain = new ArrayList<>();
-    private List<ServletRequestListener> requestListeners = new ArrayList<>();
+    private Servlet servlet;
 
     public Wrapper(String name, String servletClass) {
         this.name = name;
         this.servletClass = servletClass;
     }
 
-    public void setServlet(javax.servlet.Servlet servlet) {
+    public void service(Request request, Response response) throws ServletException, IOException {
+        if (servlet == null) {
+            try {
+                // 使用上下文的类加载器加载 servlet
+                ClassLoader loader = getParent().getWebAppClassLoader();
+                Class<?> clazz = loader.loadClass(servletClass);
+                servlet = (Servlet) clazz.newInstance();
+                
+                // 初始化 servlet
+                servlet.init(getServletConfig());
+            } catch (Exception e) {
+                throw new ServletException("Error initializing servlet", e);
+            }
+        }
+        
+        // 包装请求和响应
+        ServletRequestWrapper servletRequest = new ServletRequestWrapper(request);
+        ServletResponseWrapper servletResponse = new ServletResponseWrapper(response);
+        
+        // 调用 servlet 的 service 方法
+        servlet.service(servletRequest, servletResponse);
+    }
+
+    public void setServlet(Servlet servlet) {
         this.servlet = servlet;
     }
 
-    @Override
-    protected void initInternal() throws LifecycleException {
-        try {
-            Context context = (Context) getParent();
-            Class<?> servletClass;
-            
-            if (this.servletClass.startsWith("com.microtomcat.")) {
-                ClassLoader loader = getParent().getClass().getClassLoader();
-                servletClass = loader.loadClass(this.servletClass);
-            } else {
-                ClassLoader loader = context.getWebAppClassLoader();
-                servletClass = loader.loadClass(this.servletClass);
-            }
-
-            // 检查是否实现了标准Servlet接口
-            if (!javax.servlet.Servlet.class.isAssignableFrom(servletClass)) {
-                throw new LifecycleException("Class " + servletClass + " is not a Servlet");
-            }
-            
-            servlet = (javax.servlet.Servlet) servletClass.getDeclaredConstructor().newInstance();
-            servlet.init(createServletConfig());
-            
-        } catch (Exception e) {
-            throw new LifecycleException("Failed to initialize servlet: " + name, e);
-        }
-    }
-
-    private javax.servlet.ServletConfig createServletConfig() {
-        return new javax.servlet.ServletConfig() {
+    private ServletConfig getServletConfig() {
+        // 返回一个基本的 ServletConfig 实现
+        return new ServletConfig() {
             @Override
             public String getServletName() {
-                return name;
+                return getName();
             }
 
             @Override
-            public javax.servlet.ServletContext getServletContext() {
-                return null; // TODO: 实现ServletContext
+            public ServletContext getServletContext() {
+                return ((Context) getParent()).getServletContext();
             }
 
             @Override
             public String getInitParameter(String name) {
-                return initParameters.get(name);
+                return null;
             }
 
             @Override
-            public java.util.Enumeration<String> getInitParameterNames() {
-                return java.util.Collections.enumeration(initParameters.keySet());
+            public Enumeration<String> getInitParameterNames() {
+                return Collections.emptyEnumeration();
             }
         };
     }
 
     @Override
-    public void invoke(Request request, Response response) {
+    protected void destroyInternal() throws LifecycleException {
         try {
             if (servlet != null) {
-                // 使用包装器将我们的 Request/Response 转换为标准的 ServletRequest/ServletResponse
-                ServletRequest servletRequest = new ServletRequestWrapper(request);
-                ServletResponse servletResponse = new ServletResponseWrapper(response);
-                servlet.service(servletRequest, servletResponse);
-            } else {
-                throw new ServletException("No servlet instance available");
+                servlet.destroy();
             }
-        } catch (Exception e) {
-            log("Error invoking servlet: " + e.getMessage());
-            try {
-                response.sendError(500, "Internal Server Error: " + e.getMessage());
-            } catch (IOException ioe) {
-                log("Failed to send error response: " + ioe.getMessage());
-            }
-        }
-    }
-
-    @Override
-    protected void startInternal() throws LifecycleException {
-        log("Starting Wrapper: " + name);
-        try {
-            if (servlet == null) {
-                initInternal();
-            }
-        } catch (Exception e) {
-            throw new LifecycleException("Failed to start wrapper", e);
+        } finally {
+            servlet = null;
         }
     }
 
     @Override
     protected void stopInternal() throws LifecycleException {
-        log("Stopping Wrapper: " + name);
-        if (servlet != null) {
-            servlet.destroy();
-            servlet = null;
+        try {
+            if (servlet != null) {
+                servlet.destroy();
+                servlet = null;
+            }
+        } catch (Exception e) {
+            throw new LifecycleException("Error stopping servlet", e);
         }
     }
 
     @Override
-    protected void destroyInternal() throws LifecycleException {
-        log("Destroying Wrapper: " + name);
-        if (servlet != null) {
-            servlet.destroy();
-            servlet = null;
+    protected void startInternal() throws LifecycleException {
+        try {
+            // 在启动时初始化 servlet
+            if (servlet == null) {
+                ClassLoader loader = getParent().getWebAppClassLoader();
+                Class<?> clazz = loader.loadClass(servletClass);
+                servlet = (Servlet) clazz.newInstance();
+                servlet.init(getServletConfig());
+            }
+        } catch (Exception e) {
+            throw new LifecycleException("Error starting servlet", e);
         }
     }
 
-    public void addInitParameter(String name, String value) {
-        initParameters.put(name, value);
+    @Override
+    protected void initInternal() throws LifecycleException {
+        try {
+            // 在初始化阶段，我们可以进行一些准备工作
+            // 但实际的 servlet 初始化会在 startInternal 中进行
+            if (servletClass == null) {
+                throw new LifecycleException("No servlet class configured");
+            }
+            
+            // 验证父容器是否是 Context
+            if (!(getParent() instanceof Context)) {
+                throw new LifecycleException("Wrapper container must have Context as parent");
+            }
+            
+        } catch (Exception e) {
+            throw new LifecycleException("Error initializing wrapper", e);
+        }
     }
 
-    public void addFilter(Filter filter) {
-        filterChain.add(filter);
-    }
-
-    public void addRequestListener(ServletRequestListener listener) {
-        requestListeners.add(listener);
+    @Override
+    public void invoke(Request request, Response response) {
+        try {
+            // 调用 service 方法处理请求
+            service(request, response);
+        } catch (ServletException | IOException e) {
+            // 记录错误并可能设置错误响应
+            log("Error processing request: " + e.getMessage());
+            try {
+                response.sendError(500, "Internal Server Error");
+            } catch (IOException ex) {
+                log("Error sending error response: " + ex.getMessage());
+            }
+        }
     }
 } 

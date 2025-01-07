@@ -8,6 +8,7 @@ import com.microtomcat.container.event.ContainerEvent;
 import com.microtomcat.container.event.ContainerListener;
 import java.util.ArrayList;
 import java.util.List;
+import com.microtomcat.loader.WebAppClassLoader;
 
 public abstract class ContainerBase extends LifecycleBase implements Container {
     protected Container parent = null;
@@ -75,5 +76,13 @@ public abstract class ContainerBase extends LifecycleBase implements Container {
 
     protected void log(String message) {
         System.out.println("[" + getClass().getSimpleName() + "] " + message);
+    }
+
+    @Override
+    public WebAppClassLoader getWebAppClassLoader() {
+        if (getParent() != null) {
+            return getParent().getWebAppClassLoader();
+        }
+        return null;
     }
 } 
