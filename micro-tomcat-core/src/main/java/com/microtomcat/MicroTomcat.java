@@ -5,9 +5,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -20,13 +17,12 @@ import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.context.Context;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
-import javax.servlet.ServletException;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.context.SimpleServletContext;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.Servlet;
 
-public class HttpServer extends AbstractHttpServer {
+public class MicroTomcat extends AbstractHttpServer {
     private static final int DEFAULT_PORT = 8080;
     private final int port;
     private static final String WEB_ROOT = "webroot";
@@ -35,7 +31,7 @@ public class HttpServer extends AbstractHttpServer {
     private SessionManager sessionManager;
     private volatile ServerSocket serverSocket;
 
-    public HttpServer(int port) throws IOException {
+    public MicroTomcat(int port) throws IOException {
         super(new ServerConfig(port, false, 10, WEB_ROOT));
         this.port = port;
         this.executorService = Executors.newFixedThreadPool(10);
@@ -166,17 +162,22 @@ public class HttpServer extends AbstractHttpServer {
         }
 
         try {
-            ServerConfig config = new ServerConfig(
-                port,           // 使用解析的端口
-                false,          // 使用阻塞式 IO
-                10,            // 线程池大小
-                WEB_ROOT       // Web根目录
-            );
+            // 创建并配置 MicroTomcat
+            MicroTomcat tomcat = new MicroTomcat(port);
             
-            AbstractHttpServer server = HttpServerFactory.createServer(config);
-            server.init();
-            server.start();
-        } catch (IOException | LifecycleException e) {
+            // 创建 Context
+            String contextPath = "";
+            String docBase = "webroot";
+            Context context = tomcat.addContext(contextPath, docBase);
+            
+            // 启动服务器
+            tomcat.init();
+            tomcat.start();
+            
+            // 等待服务器停止
+            Thread.currentThread().join();
+            
+        } catch (Exception e) {
             System.err.println("Server startup failed: " + e.getMessage());
             e.printStackTrace();
         }
@@ -246,8 +247,16 @@ public class HttpServer extends AbstractHttpServer {
     }
 
     public void addServletMappingDecoded(Context context, String urlPattern, String servletName) {
-        // urlPattern 已经是解码后的，直接使用
-        addServletMapping(context, urlPattern, servletName);
+        if (context == null) {
+            throw new IllegalArgumentException("context cannot be null");
+        }
+        if (urlPattern == null) {
+            throw new IllegalArgumentException("urlPattern cannot be null");
+        }
+        if (servletName == null) {
+            throw new IllegalArgumentException("servletName cannot be null");
+        }
+        context.addServletMapping(urlPattern, servletName);
     }
 
     public void addServlet(Context context, String servletName, Servlet servlet, String urlPattern) {

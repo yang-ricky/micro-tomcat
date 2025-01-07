@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.ArgumentCaptor;
 
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
@@ -19,16 +18,14 @@ import javax.servlet.ServletException;
 import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class HttpServerTest {
+public class MicroTomcatTest {
     
-    private HttpServer server;
+    private MicroTomcat server;
     
     @Mock
     private Context mockContext;
@@ -45,7 +42,7 @@ public class HttpServerTest {
     @BeforeEach
     void setUp() throws IOException {
         MockitoAnnotations.openMocks(this);
-        server = new HttpServer(8080);
+        server = new MicroTomcat(8080);
         server.setContext(mockContext);
         outputStream = new ByteArrayOutputStream();
         
@@ -107,7 +104,7 @@ public class HttpServerTest {
     @Test
     void testHandleRequestWithoutContext() throws Exception {
         // 创建一个没有 Context 的服务器
-        HttpServer serverWithoutContext = new HttpServer(8080);
+        MicroTomcat serverWithoutContext = new MicroTomcat(8080);
         
         // 准备请求内容
         String requestContent = 
@@ -168,7 +165,7 @@ public class HttpServerTest {
     @Test
     void testServerStartAndStop() throws Exception {
         // 创建一个可以被中断的服务器
-        HttpServer testServer = new HttpServer(8080);
+        MicroTomcat testServer = new MicroTomcat(8080);
         
         Thread serverThread = new Thread(() -> {
             try {
@@ -217,7 +214,7 @@ public class HttpServerTest {
     @Test
     void testAddContextAndServlet() throws Exception {
         // 创建新的服务器实例
-        HttpServer testServer = new HttpServer(8080);
+        MicroTomcat testServer = new MicroTomcat(8080);
         
         // 添加 Context
         Context context = testServer.addContext("", "webroot");
@@ -273,7 +270,7 @@ public class HttpServerTest {
 
     @Test
     void testAddContextWithNullValues() throws Exception {
-        HttpServer server = new HttpServer(8080);
+        MicroTomcat server = new MicroTomcat(8080);
         
         // 测试 null 值
         assertThrows(IllegalArgumentException.class, () -> {
@@ -287,7 +284,7 @@ public class HttpServerTest {
 
     @Test
     void testAddServletWithNullValues() throws Exception {
-        HttpServer server = new HttpServer(8080);
+        MicroTomcat server = new MicroTomcat(8080);
         Context context = server.addContext("", "webroot");
         
         // 测试 null 值

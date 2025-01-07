@@ -28,7 +28,7 @@ start_node() {
          -Dcom.sun.management.jmxremote.authenticate=false \
          -Dcom.sun.management.jmxremote.ssl=false \
          -cp target/classes:target/dependency/* \
-         com.microtomcat.HttpServer --port=${PORT} &
+         com.microtomcat.MicroTomcat --port=${PORT} &
     
     local PID=$!
     SERVER_PIDS+=($PID)

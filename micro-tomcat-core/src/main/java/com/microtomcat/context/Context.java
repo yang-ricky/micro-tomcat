@@ -3,7 +3,6 @@ package com.microtomcat.context;
 import com.microtomcat.container.Container;
 import com.microtomcat.container.ContainerBase;
 import com.microtomcat.container.Wrapper;
-import com.microtomcat.example.SessionTestServlet;
 import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
@@ -81,13 +80,6 @@ public class Context extends ContainerBase {
                 // 初始化和启动 Wrapper
                 defaultWrapper.init();
                 defaultWrapper.start();
-                
-                // 注册其他 Servlet
-                log("Registering HelloServlet...");
-                Wrapper helloWrapper = new Wrapper("HelloServlet", "com.microtomcat.example.HelloServlet");
-                Wrapper sessionTestWrapper = new Wrapper("SessionTestServlet", "com.microtomcat.example.SessionTestServlet");
-                addChild(helloWrapper);
-                addChild(sessionTestWrapper);
             }
             
             log("Successfully registered servlets for context: " + name);

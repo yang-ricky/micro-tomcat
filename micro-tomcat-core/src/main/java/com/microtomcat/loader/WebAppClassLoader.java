@@ -52,18 +52,6 @@ public class WebAppClassLoader extends MicroTomcatClassLoader {
 
             log("ricky: " + name);
 
-            // 2. 对框架类，委托给父加载器
-            if (name.startsWith("com.microtomcat.example.HelloServlet")
-            || name.startsWith("com.microtomcat.servlet.HttpServlet")
-            ) {
-                log("Delegating " + name + " to parent because it's a framework class");
-                try {
-                    return getParent().loadClass(name);
-                } catch (ClassNotFoundException e) {
-                    log("Parent failed to load " + name + ", will try locally");
-                }
-            }
-
             // 3. 其他类先尝试自己加载
             try {
                 return findClass(name);
