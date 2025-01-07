@@ -45,6 +45,20 @@ public class Wrapper extends ContainerBase {
         
         // 调用 servlet 的 service 方法
         servlet.service(servletRequest, servletResponse);
+        
+        // 确保响应被提交
+        if (!response.isCommitted()) {
+            // 从包装器中获取设置的 Content-Type
+            String contentType = servletResponse.getContentType();
+            log("Content-Type from wrapper: " + contentType);
+            log("Original response Content-Type: " + response.getContentType());
+            
+            if (contentType != null) {
+                response.setContentType(contentType);
+                log("After setting Content-Type: " + response.getContentType());
+            }
+            response.flushBuffer();
+        }
     }
 
     public void setServlet(Servlet servlet) {
@@ -138,13 +152,18 @@ public class Wrapper extends ContainerBase {
         try {
             // 调用 service 方法处理请求
             service(request, response);
+            
+            // 确保响应被提交
+            if (!response.isCommitted()) {
+                response.flushBuffer();
+            }
         } catch (ServletException | IOException e) {
             // 记录错误并可能设置错误响应
             log("Error processing request: " + e.getMessage());
             try {
                 response.sendError(500, "Internal Server Error");
             } catch (IOException ex) {
-                log("Error sending error response: " + ex.getMessage());
+                log("Failed to send error response: " + ex.getMessage());
             }
         }
     }

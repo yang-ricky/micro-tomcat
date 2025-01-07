@@ -49,6 +49,7 @@ public class Context extends ContainerBase {
     private Map<String, Servlet> servletMap = new ConcurrentHashMap<>();
     private ServletContext servletContext;
     private final SessionStoreAdapter sessionStore = new InMemorySessionStoreAdapter();
+    private final Map<String, String> servletMappings = new ConcurrentHashMap<>();
 
     public Context(String name, String docBase) throws IOException {
         this.name = name;
@@ -109,25 +110,31 @@ public class Context extends ContainerBase {
         return sessionManager;
     }
 
-    public void addServlet(String name, Servlet servlet) {
-        servletMap.put(name, servlet);
+    public void addServlet(String servletName, Servlet servlet) {
+        // 创建 Wrapper
+        Wrapper wrapper = new Wrapper(servletName, servlet.getClass().getName());
+        wrapper.setServlet(servlet);
+        wrapper.setParent(this);
         
-        // 创建并添加对应的 Wrapper
-        Wrapper wrapper = new Wrapper(name, servlet.getClass().getName());
-        wrapper.setServlet(servlet);  // 直接设置已存在的servlet实例
-        addChild(wrapper);  // 添加到子容器中
+        // 添加到子容器
+        addChild(wrapper);
         
+        // 如果是 dispatcherServlet，也添加到 servletMap
+        if ("dispatcherServlet".equals(servletName)) {
+            servletMap.put(servletName, servlet);
+        }
+
+        // 初始化 servlet
         try {
-            // 创建一个简单的 ServletConfig 实现
             ServletConfig config = new ServletConfig() {
                 @Override
                 public String getServletName() {
-                    return name;
+                    return servletName;
                 }
 
                 @Override
                 public ServletContext getServletContext() {
-                    return null; // TODO: 实现 ServletContext
+                    return Context.this.getServletContext();
                 }
 
                 @Override
@@ -152,7 +159,7 @@ public class Context extends ContainerBase {
             };
             servlet.init(config);
         } catch (ServletException e) {
-            log("Failed to initialize servlet: " + name);
+            log("Failed to initialize servlet: " + servletName);
         }
     }
 
@@ -162,68 +169,61 @@ public class Context extends ContainerBase {
         Servlet dispatcher = servletMap.get("dispatcherServlet");
         if (dispatcher != null) {
             try {
-                // 将 Request/Response 适配成 ServletRequest/ServletResponse
-                ServletRequestWrapper servletRequest = new ServletRequestWrapper(request);
-                ServletResponseWrapper servletResponse = new ServletResponseWrapper(response);
-                
-                dispatcher.service(servletRequest, servletResponse);
-                return; // 处理完请求，就直接return
-            } catch (NoRouteMatchException e) {
-                // 继续后面静态资源处理
-            } catch (ServletException | IOException e) {
+                log("Using dispatcherServlet");
+                dispatcher.service(request, response);
+                response.flushBuffer();  // 确保响应被刷新
+                return;
+            } catch (Exception e) {
                 log("Error invoking dispatcherServlet: " + e.getMessage());
             }
         }
 
-        // 原有的静态资源或其他 servlet 处理逻辑
-        request.setContext(this);
-        String servletPath = getServletPath(request.getUri());
-        if (servletPath != null && servletPath.startsWith("/servlet/")) {
-            String servletName = servletPath.substring("/servlet/".length());
-            servletName = servletName.replace('/', '.');
-            try {
-                Wrapper wrapper = (Wrapper) findChild(servletName);
-                if (wrapper == null) {
-                    wrapper = new Wrapper(servletName, servletName.substring(servletName.lastIndexOf('.') + 1));
-                    addChild(wrapper);
-                    wrapper.init();
-                    wrapper.start();
-                }
-                wrapper.invoke(request, response);
-            } catch (Exception e) {
-                log("Error processing request: " + e.getMessage());
+        // 查找匹配的 servlet
+        String uri = request.getRequestURI();
+        log("Looking for servlet mapping for URI: " + uri);
+        String mappedServletName = findServletMapping(uri);
+        if (mappedServletName != null) {
+            log("Found servlet mapping: " + mappedServletName);
+            Container wrapper = findChild(mappedServletName);
+            if (wrapper instanceof Wrapper) {
                 try {
-                    response.sendError(500, "Internal Server Error: " + e.getMessage());
-                } catch (IOException ioe) {
-                    log("Failed to send error response: " + ioe.getMessage());
+                    log("Invoking servlet: " + mappedServletName);
+                    ((Wrapper) wrapper).service(request, response);
+                    if (!response.isCommitted()) {
+                        response.setStatus(HttpServletResponse.SC_OK);
+                    }
+                    response.flushBuffer();  // 确保响应被刷新
+                    return;
+                } catch (Exception e) {
+                    log("Error invoking servlet: " + e.getMessage());
                 }
             }
-        } else {
-            // 处理静态资源
+        }
+
+        // 处理静态资源
+        try {
+            String relativePath = uri.startsWith("/") ? uri.substring(1) : uri;
+            // 如果URI以上下文路径开头，移除它
+            if (relativePath.startsWith(name) && !name.equals("/")) {
+                relativePath = relativePath.substring(name.length());
+            }
+            // 如果路径是目录，默认查找 index.html
+            if (relativePath.endsWith("/")) {
+                relativePath += "index.html";
+            }
+            
+            File file = new File(docBase, relativePath);
+            if (file.exists() && file.isFile()) {
+                response.sendStaticResource(file);
+            } else {
+                response.sendError(404, "File Not Found: " + relativePath);
+            }
+        } catch (IOException e) {
+            log("Error sending static resource: " + e.getMessage());
             try {
-                String relativePath = request.getUri();
-                // 如果URI以上下文路径开头，移除它
-                if (relativePath.startsWith(name) && !name.equals("/")) {
-                    relativePath = relativePath.substring(name.length());
-                }
-                // 如果路径是目录，默认查找 index.html
-                if (relativePath.endsWith("/")) {
-                    relativePath += "index.html";
-                }
-                
-                File file = new File(docBase, relativePath);
-                if (file.exists() && file.isFile()) {
-                    response.sendStaticResource(file);
-                } else {
-                    response.sendError(404, "File Not Found: " + relativePath);
-                }
-            } catch (IOException e) {
-                log("Error sending static resource: " + e.getMessage());
-                try {
-                    response.sendError(500, "Internal Server Error: " + e.getMessage());
-                } catch (IOException ioe) {
-                    log("Failed to send error response: " + ioe.getMessage());
-                }
+                response.sendError(500, "Internal Server Error: " + e.getMessage());
+            } catch (IOException ioe) {
+                log("Failed to send error response: " + ioe.getMessage());
             }
         }
     }
@@ -317,82 +317,20 @@ public class Context extends ContainerBase {
                 uri = "/";
             }
             
-            ServletResponseWrapper wrappedResponse = new ServletResponseWrapper(response);
-            
-            // 处理根路径请求
-            if (uri.equals("/") || uri.equals("/index.html")) {
-                System.out.println("DEBUG Context : Handling root path request: " + uri);
-                if (!response.isCommitted()) {
-                    wrappedResponse.setStatus(HttpServletResponse.SC_OK);
-                    wrappedResponse.setContentType("text/html");
-                    wrappedResponse.setHeader("Server", "MicroTomcat");
-                    
-                    String content = "<!DOCTYPE html>\n"
-                        + "<html>\n"
-                        + "<head>\n"
-                        + "    <title>Welcome to MicroTomcat</title>\n"
-                        + "</head>\n"
-                        + "<body>\n"
-                        + "    <h1>Welcome to MicroTomcat inside context</h1>\n"
-                        + "    <p>Server is running successfully!</p>\n"
-                        + "</body>\n"
-                        + "</html>";
-                    
-                    byte[] contentBytes = content.getBytes("UTF-8");
-                    wrappedResponse.setContentLength(contentBytes.length);
-                    
-                    // 先发送头部
-                    response.sendHeaders();
-                    
-                    // 再发送内容
-                    response.getOutputStream().write(contentBytes);
-                    response.getOutputStream().flush();
+            // 先尝试查找并调用 Servlet
+            String mappedServletName = findServletMapping(uri);
+            if (mappedServletName != null) {
+                Container wrapper = findChild(mappedServletName);
+                if (wrapper instanceof Wrapper) {
+                    wrapper.invoke(request, response);
+                    return;
                 }
-                return;
             }
             
-            // 获取 Servlet 路径
-            String servletPath = getServletPath(uri);
-            
-            // 查找匹配的 Wrapper（Servlet）
-            Container wrapper = findChild(servletPath);
-            
-            if (wrapper != null && wrapper instanceof Wrapper) {
-                // 使用原始的 response 对象调用 Wrapper
-                ((Wrapper) wrapper).service(request, response);
-            } else {
-                // 处理静态资源
-                String relativePath = uri.startsWith("/") ? uri.substring(1) : uri;
-                File file = new File(docBase, relativePath);
-                
-                try {
-                    if (file.exists() && file.isFile()) {
-                        wrappedResponse.setContentType(getServletContext().getMimeType(uri));
-                        // 设置内容长度
-                        byte[] content = Files.readAllBytes(file.toPath());
-                        wrappedResponse.setContentLength(content.length);
-                        
-                        // 使用 PrintWriter 而不是 OutputStream
-                        PrintWriter writer = wrappedResponse.getWriter();
-                        writer.write(new String(content, StandardCharsets.UTF_8));
-                        writer.flush();
-                    } else {
-                        // 如果文件不存在，返回一个简单的默认页面
-                        if (uri.equals("/index.html")) {
-                            wrappedResponse.setContentType("text/html");
-                            PrintWriter writer = wrappedResponse.getWriter();
-                            writer.println("<html><body>");
-                            writer.println("<h1>Welcome to MicroTomcat inside context</h1>");
-                            writer.println("<p>Server is running successfully!</p>");
-                            writer.println("</body></html>");
-                        } else {
-                            wrappedResponse.sendError(404, "File Not Found: " + uri);
-                        }
-                    }
-                } catch (IOException e) {
-                    log("Error sending response: " + e.getMessage());
-                    wrappedResponse.sendError(500, "Internal Server Error");
-                }
+            // 如果没有找到匹配的 Servlet，再处理欢迎页面
+            if (uri.equals("/") || uri.equals("/index.html")) {
+                ServletResponseWrapper wrappedResponse = new ServletResponseWrapper(response);
+                // ... 原有的欢迎页面处理逻辑 ...
             }
         } catch (Exception e) {
             System.err.println("ERROR in Context.service: " + e.getMessage());
@@ -407,5 +345,69 @@ public class Context extends ContainerBase {
         if (servletContext.getAttribute("webRoot") == null) {
             servletContext.setAttribute("webRoot", this.docBase);
         }
+    }
+
+    /**
+     * 添加 Servlet 映射
+     * @param urlPattern URL 模式，如 "/hello", "*.jsp", "/*" 等
+     * @param servletName Servlet 的名称
+     */
+    public void addServletMapping(String urlPattern, String servletName) {
+        // 验证参数
+        if (urlPattern == null || servletName == null) {
+            throw new IllegalArgumentException("urlPattern and servletName must not be null");
+        }
+
+        // 规范化 URL 模式
+        if (!urlPattern.startsWith("/") && !urlPattern.startsWith("*")) {
+            urlPattern = "/" + urlPattern;
+        }
+
+        // 存储映射
+        servletMappings.put(urlPattern, servletName);
+        log("Added servlet mapping: " + urlPattern + " -> " + servletName);
+    }
+
+    /**
+     * 根据 URL 查找对应的 Servlet
+     * @param uri 请求的 URI
+     * @return 匹配的 Servlet 名称，如果没有匹配返回 null
+     */
+    protected String findServletMapping(String uri) {
+        // 1. 精确匹配
+        String servletName = servletMappings.get(uri);
+        if (servletName != null) {
+            return servletName;
+        }
+
+        // 2. 路径匹配（最长匹配优先）
+        String longestMatch = "";
+        String matchedServlet = null;
+        for (Map.Entry<String, String> entry : servletMappings.entrySet()) {
+            String pattern = entry.getKey();
+            if (pattern.endsWith("/*")) {
+                String prefix = pattern.substring(0, pattern.length() - 2);
+                if (uri.startsWith(prefix) && prefix.length() > longestMatch.length()) {
+                    longestMatch = prefix;
+                    matchedServlet = entry.getValue();
+                }
+            }
+        }
+        if (matchedServlet != null) {
+            return matchedServlet;
+        }
+
+        // 3. 扩展名匹配
+        int lastDot = uri.lastIndexOf('.');
+        if (lastDot >= 0) {
+            String extension = "*" + uri.substring(lastDot);
+            servletName = servletMappings.get(extension);
+            if (servletName != null) {
+                return servletName;
+            }
+        }
+
+        // 4. 默认匹配 "/*"
+        return servletMappings.get("/*");
     }
 } 

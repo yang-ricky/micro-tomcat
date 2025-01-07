@@ -24,6 +24,7 @@ import javax.servlet.ServletException;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.context.SimpleServletContext;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.Servlet;
 
 public class HttpServer extends AbstractHttpServer {
     private static final int DEFAULT_PORT = 8080;
@@ -90,64 +91,39 @@ public class HttpServer extends AbstractHttpServer {
 
     protected void handleRequest(Socket socket) throws IOException {
         try (InputStream input = socket.getInputStream();
-             OutputStream output = socket.getOutputStream();
-             BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
-
-            // 读取请求行
-            String requestLine = reader.readLine();
-            if (requestLine == null) {
-                return;
-            }
-
-            // 解析请求
-            String[] parts = requestLine.split(" ");
-            if (parts.length != 3) {
-                return;
-            }
-
-            // 创建 Request 和 Response 对象
+             OutputStream output = socket.getOutputStream()) {
+            
             Request request = new Request(input, sessionManager);
-            // 解析请求
-            request.parse();
-
             Response response = new Response(output);
             
-            // 如果有 Context，使用 Context 处理请求
+            request.parse();
+            
+            log("Handling request: " + request.getRequestURI());
+            
+            Context context = this.context;
+            log("Using context: " + (context != null ? context.getName() : "null"));
+            
             if (context != null) {
                 try {
                     request.setContext(context);
-                    context.service(request, response);
-                    // 确保状态码被设置并且响应被完全写入
+                    context.invoke(request, response);
                     if (!response.isCommitted()) {
                         response.setStatus(HttpServletResponse.SC_OK);
                     }
-                    response.flushBuffer();
-                    return;
-                } catch (ServletException e) {
-                    log("Error processing request through context: " + e.getMessage());
-                    e.printStackTrace();
-                    // 发送500错误响应
-                    String errorMessage = "500 Internal Server Error";
-                    output.write("HTTP/1.1 500 Internal Server Error\r\n".getBytes());
-                    output.write("Content-Type: text/plain\r\n".getBytes());
-                    output.write(("Content-Length: " + errorMessage.length() + "\r\n").getBytes());
-                    output.write("\r\n".getBytes());
-                    output.write(errorMessage.getBytes());
-                    output.flush();
-                    return;
+                } catch (Exception e) {
+                    log("Error processing request: " + e.getMessage());
+                    response.setContentType("text/plain");
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    String errorMsg = "500 Internal Server Error: " + e.getMessage() + "\n";
+                    output.write(errorMsg.getBytes());
                 }
+            } else {
+                response.setContentType("text/plain");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                String errorMsg = "404 Not Found: " + request.getRequestURI() + "\n";
+                output.write(errorMsg.getBytes());
             }
-
-            // 如果 Context 没有处理请求，返回 404
-            String uri = parts[1];
-            String errorMessage = "404 Not Found: " + uri;
-            output.write("HTTP/1.1 404 Not Found\r\n".getBytes());
-            output.write("Content-Type: text/plain\r\n".getBytes());
-            output.write(("Content-Length: " + errorMessage.length() + "\r\n").getBytes());
-            output.write("\r\n".getBytes());
-            output.write(errorMessage.getBytes());
-            output.flush();
-            log("Request not handled: " + uri);
+            response.flushBuffer();
         }
     }
 
@@ -229,5 +205,53 @@ public class HttpServer extends AbstractHttpServer {
             }
         }
         log("Server stopped");
+    }
+
+    public Context addContext(String contextPath, String docBase) throws IOException {
+        if (contextPath == null) {
+            throw new IllegalArgumentException("contextPath cannot be null");
+        }
+        if (docBase == null) {
+            throw new IllegalArgumentException("docBase cannot be null");
+        }
+        Context newContext = new Context(contextPath, docBase);
+        this.context = newContext;
+        return newContext;
+    }
+
+    public void addServlet(Context context, String servletName, Servlet servlet) {
+        if (context == null) {
+            throw new IllegalArgumentException("context cannot be null");
+        }
+        if (servletName == null) {
+            throw new IllegalArgumentException("servletName cannot be null");
+        }
+        if (servlet == null) {
+            throw new IllegalArgumentException("servlet cannot be null");
+        }
+        context.addServlet(servletName, servlet);
+    }
+
+    public void addServletMapping(Context context, String urlPattern, String servletName) {
+        if (context == null) {
+            throw new IllegalArgumentException("context cannot be null");
+        }
+        if (urlPattern == null) {
+            throw new IllegalArgumentException("urlPattern cannot be null");
+        }
+        if (servletName == null) {
+            throw new IllegalArgumentException("servletName cannot be null");
+        }
+        context.addServletMapping(urlPattern, servletName);
+    }
+
+    public void addServletMappingDecoded(Context context, String urlPattern, String servletName) {
+        // urlPattern 已经是解码后的，直接使用
+        addServletMapping(context, urlPattern, servletName);
+    }
+
+    public void addServlet(Context context, String servletName, Servlet servlet, String urlPattern) {
+        addServlet(context, servletName, servlet);
+        addServletMapping(context, urlPattern, servletName);
     }
 }
