@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ApplicationFilterChain implements FilterChain {
-    private List<Filter> filters = new ArrayList<>();
+    private final List<Filter> filters = new ArrayList<>();
     private int position = 0;
     private Servlet servlet;
 
@@ -27,5 +27,9 @@ public class ApplicationFilterChain implements FilterChain {
         } else if (servlet != null) {
             servlet.service(request, response);
         }
+    }
+
+    public void reset() {
+        position = 0;
     }
 } 

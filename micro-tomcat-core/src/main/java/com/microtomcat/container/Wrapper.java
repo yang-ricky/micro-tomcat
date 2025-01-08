@@ -162,4 +162,8 @@ public class Wrapper extends ContainerBase {
             }
         }
     }
+
+    public Servlet getServlet() {
+        return servlet;
+    }
 } 

@@ -32,6 +32,11 @@ import com.microtomcat.context.SimpleServletContext;
 
 import javax.servlet.http.HttpServletResponse;
 
+import com.microtomcat.filter.FilterManager;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import com.microtomcat.filter.ApplicationFilterChain;
+
 public class Context extends ContainerBase {
     private final String docBase;
     private final WebAppClassLoader webAppClassLoader;
@@ -40,6 +45,7 @@ public class Context extends ContainerBase {
     private ServletContext servletContext;
     private final SessionStoreAdapter sessionStore = new InMemorySessionStoreAdapter();
     private final Map<String, String> servletMappings = new ConcurrentHashMap<>();
+    private final FilterManager filterManager;
 
     public Context(String name, String docBase) throws IOException {
         this.name = name;
@@ -49,6 +55,9 @@ public class Context extends ContainerBase {
         SimpleServletContext simpleContext = new SimpleServletContext(getName());
         simpleContext.setAttribute("webRoot", docBase);  // 存储 webRoot 路径
         this.servletContext = simpleContext;
+        
+        // 初始化 FilterManager
+        this.filterManager = new FilterManager(this.servletContext);
         
         // 创建分布式会话管理器
         ClusterRegistry clusterRegistry = ClusterRegistry.getInstance();
@@ -153,67 +162,26 @@ public class Context extends ContainerBase {
 
     @Override
     public void invoke(Request request, Response response) {
-        // 优先处理 dispatcherServlet
-        Servlet dispatcher = servletMap.get("dispatcherServlet");
-        if (dispatcher != null) {
+        String uri = request.getRequestURI();
+        log("Processing request for URI: " + uri);
+        
+        // 创建 FilterChain
+        ApplicationFilterChain filterChain = filterManager.createFilterChain(uri);
+        
+        // 设置目标 servlet
+        Servlet servlet = findServletForPath(uri);
+        if (servlet != null) {
+            filterChain.setServlet(servlet);
             try {
-                log("Using dispatcherServlet");
-                dispatcher.service(request, response);
-                response.flushBuffer();  // 确保响应被刷新
+                filterChain.doFilter(request, response);
                 return;
             } catch (Exception e) {
-                log("Error invoking dispatcherServlet: " + e.getMessage());
+                log("Error in filter chain: " + e.getMessage());
             }
         }
-
-        // 查找匹配的 servlet
-        String uri = request.getRequestURI();
-        log("Looking for servlet mapping for URI: " + uri);
-        String mappedServletName = findServletMapping(uri);
-        if (mappedServletName != null) {
-            log("Found servlet mapping: " + mappedServletName);
-            Container wrapper = findChild(mappedServletName);
-            if (wrapper instanceof Wrapper) {
-                try {
-                    log("Invoking servlet: " + mappedServletName);
-                    ((Wrapper) wrapper).service(request, response);
-                    if (!response.isCommitted()) {
-                        response.setStatus(HttpServletResponse.SC_OK);
-                    }
-                    response.flushBuffer();  // 确保响应被刷新
-                    return;
-                } catch (Exception e) {
-                    log("Error invoking servlet: " + e.getMessage());
-                }
-            }
-        }
-
-        // 处理静态资源
-        try {
-            String relativePath = uri.startsWith("/") ? uri.substring(1) : uri;
-            // 如果URI以上下文路径开头，移除它
-            if (relativePath.startsWith(name) && !name.equals("/")) {
-                relativePath = relativePath.substring(name.length());
-            }
-            // 如果路径是目录，默认查找 index.html
-            if (relativePath.endsWith("/")) {
-                relativePath += "index.html";
-            }
-            
-            File file = new File(docBase, relativePath);
-            if (file.exists() && file.isFile()) {
-                response.sendStaticResource(file);
-            } else {
-                response.sendError(404, "File Not Found: " + relativePath);
-            }
-        } catch (IOException e) {
-            log("Error sending static resource: " + e.getMessage());
-            try {
-                response.sendError(500, "Internal Server Error: " + e.getMessage());
-            } catch (IOException ioe) {
-                log("Failed to send error response: " + ioe.getMessage());
-            }
-        }
+        
+        // 如果没有匹配的servlet，处理静态资源
+        handleStaticResource(request, response);
     }
 
     private String getServletPath(String uri) {
@@ -274,7 +242,7 @@ public class Context extends ContainerBase {
 
     @Override
     protected void destroyInternal() throws LifecycleException {
-        log("Destroying context: " + name);
+        filterManager.destroy();
         webAppClassLoader.destroy();
     }
 
@@ -397,5 +365,63 @@ public class Context extends ContainerBase {
 
         // 4. 默认匹配 "/*"
         return servletMappings.get("/*");
+    }
+
+    public void addFilter(String filterName, Filter filter) {
+        filterManager.addFilter(filterName, filter);
+    }
+
+    public void addFilterMapping(String urlPattern, String filterName) {
+        filterManager.addFilterMapping(urlPattern, filterName);
+    }
+
+    private Servlet findServletForPath(String uri) {
+        // 先尝试 dispatcherServlet
+        Servlet dispatcher = servletMap.get("dispatcherServlet");
+        if (dispatcher != null) {
+            return dispatcher;
+        }
+
+        // 查找匹配的 servlet
+        String mappedServletName = findServletMapping(uri);
+        if (mappedServletName != null) {
+            Container wrapper = findChild(mappedServletName);
+            if (wrapper instanceof Wrapper) {
+                return ((Wrapper) wrapper).getServlet();
+            }
+        }
+        
+        return null;
+    }
+
+    private void handleStaticResource(Request request, Response response) {
+        try {
+            String uri = request.getRequestURI();
+            String relativePath = uri.startsWith("/") ? uri.substring(1) : uri;
+            
+            // 如果URI以上下文路径开头，移除它
+            if (relativePath.startsWith(name) && !name.equals("/")) {
+                relativePath = relativePath.substring(name.length());
+            }
+            
+            // 如果路径是目录，默认查找 index.html
+            if (relativePath.endsWith("/")) {
+                relativePath += "index.html";
+            }
+            
+            File file = new File(docBase, relativePath);
+            if (file.exists() && file.isFile()) {
+                response.sendStaticResource(file);
+            } else {
+                response.sendError(404, "File Not Found: " + relativePath);
+            }
+        } catch (IOException e) {
+            log("Error sending static resource: " + e.getMessage());
+            try {
+                response.sendError(500, "Internal Server Error: " + e.getMessage());
+            } catch (IOException ioe) {
+                log("Failed to send error response: " + ioe.getMessage());
+            }
+        }
     }
 } 
