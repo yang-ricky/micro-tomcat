@@ -6,7 +6,7 @@ import javax.servlet.*;
 import javax.servlet.http.*;
 import com.microtomcat.session.Session;
 import com.microtomcat.session.SessionManager;
-import com.microtomcat.context.Context;
+import com.microtomcat.container.Context;
 import com.microtomcat.session.HttpSessionWrapper;
 
 public class Request implements HttpServletRequest {

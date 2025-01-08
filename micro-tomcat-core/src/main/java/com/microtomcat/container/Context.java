@@ -1,12 +1,8 @@
-package com.microtomcat.context;
+package com.microtomcat.container;
 
-import com.microtomcat.container.Container;
-import com.microtomcat.container.ContainerBase;
-import com.microtomcat.container.Wrapper;
 import com.microtomcat.cluster.ClusterRegistry;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
-import com.microtomcat.connector.ServletRequestWrapper;
 import com.microtomcat.connector.ServletResponseWrapper;
 import com.microtomcat.lifecycle.Lifecycle;
 import com.microtomcat.lifecycle.LifecycleException;
@@ -33,11 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.microtomcat.context.SimpleServletContext;
 
 // 添加缺失的 IO 相关导入
-import java.io.FileInputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.nio.file.Files;
-import java.nio.charset.StandardCharsets;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -103,6 +94,8 @@ public class Context extends ContainerBase {
     }
 
     public void addServlet(String servletName, Servlet servlet) {
+        log("Adding servlet: " + servletName);  // 添加日志
+        
         // 创建 Wrapper
         Wrapper wrapper = new Wrapper(servletName, servlet.getClass().getName());
         wrapper.setServlet(servlet);
@@ -113,11 +106,13 @@ public class Context extends ContainerBase {
         
         // 如果是 dispatcherServlet，也添加到 servletMap
         if ("dispatcherServlet".equals(servletName)) {
+            log("Adding dispatcherServlet to servletMap");  // 添加日志
             servletMap.put(servletName, servlet);
         }
 
         // 初始化 servlet
         try {
+            log("Initializing servlet: " + servletName);  // 添加日志
             ServletConfig config = new ServletConfig() {
                 @Override
                 public String getServletName() {
@@ -150,8 +145,9 @@ public class Context extends ContainerBase {
                 }
             };
             servlet.init(config);
+            log("Servlet initialized successfully: " + servletName);  // 添加日志
         } catch (ServletException e) {
-            log("Failed to initialize servlet: " + servletName);
+            log("Failed to initialize servlet: " + servletName + ", error: " + e.getMessage());
         }
     }
 

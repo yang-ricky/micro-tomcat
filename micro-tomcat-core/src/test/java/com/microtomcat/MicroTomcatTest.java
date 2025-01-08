@@ -1,8 +1,9 @@
 package com.microtomcat;
 
-import com.microtomcat.context.Context;
+import com.microtomcat.container.Context;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
+import com.microtomcat.protocol.Http11Protocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -42,7 +43,7 @@ public class MicroTomcatTest {
     @BeforeEach
     void setUp() throws IOException {
         MockitoAnnotations.openMocks(this);
-        server = new MicroTomcat(8080);
+        server = new MicroTomcat(5631);
         server.setContext(mockContext);
         outputStream = new ByteArrayOutputStream();
         
@@ -91,7 +92,7 @@ public class MicroTomcatTest {
         }).when(mockContext).invoke(any(Request.class), any(Response.class));
 
         // 执行请求处理
-        server.handleRequest(mockSocket);
+        ((Http11Protocol)server.getProtocol()).handleRequest(mockSocket);
 
         // 验证响应
         String response = outputStream.toString();
@@ -104,7 +105,7 @@ public class MicroTomcatTest {
     @Test
     void testHandleRequestWithoutContext() throws Exception {
         // 创建一个没有 Context 的服务器
-        MicroTomcat serverWithoutContext = new MicroTomcat(8080);
+        MicroTomcat serverWithoutContext = new MicroTomcat(5632);
         
         // 准备请求内容
         String requestContent = 
@@ -121,8 +122,8 @@ public class MicroTomcatTest {
         when(testSocket.getInputStream()).thenReturn(testInput);
         when(testSocket.getOutputStream()).thenReturn(testOutput);
         
-        // 执行请求处理
-        serverWithoutContext.handleRequest(testSocket);
+        // 使用 protocol 处理请求
+        ((Http11Protocol)serverWithoutContext.getProtocol()).handleRequest(testSocket);
 
         // 验证响应是 404
         String response = testOutput.toString();
@@ -139,7 +140,7 @@ public class MicroTomcatTest {
             .when(mockContext).invoke(any(Request.class), any(Response.class));
 
         // 执行请求处理
-        server.handleRequest(mockSocket);
+        ((Http11Protocol)server.getProtocol()).handleRequest(mockSocket);
 
         // 验证响应是 500
         String response = outputStream.toString();
@@ -156,7 +157,7 @@ public class MicroTomcatTest {
         when(mockSocket.getInputStream()).thenReturn(invalidInputStream);
 
         // 执行请求处理
-        server.handleRequest(mockSocket);
+        ((Http11Protocol)server.getProtocol()).handleRequest(mockSocket);
 
         // 验证没有调用 Context
         verify(mockContext, never()).service(any(Request.class), any(Response.class));
@@ -165,7 +166,7 @@ public class MicroTomcatTest {
     @Test
     void testServerStartAndStop() throws Exception {
         // 创建一个可以被中断的服务器
-        MicroTomcat testServer = new MicroTomcat(8080);
+        MicroTomcat testServer = new MicroTomcat(5633);
         
         Thread serverThread = new Thread(() -> {
             try {
@@ -206,7 +207,7 @@ public class MicroTomcatTest {
         when(mockSocket.getInputStream()).thenReturn(testInput);
         when(mockSocket.getOutputStream()).thenReturn(testOutput);
         
-        server.handleRequest(mockSocket);
+        ((Http11Protocol)server.getProtocol()).handleRequest(mockSocket);
         
         return testOutput.toString();
     }
@@ -214,7 +215,7 @@ public class MicroTomcatTest {
     @Test
     void testAddContextAndServlet() throws Exception {
         // 创建新的服务器实例
-        MicroTomcat testServer = new MicroTomcat(8080);
+        MicroTomcat testServer = new MicroTomcat(5634);
         
         // 添加 Context
         Context context = testServer.addContext("", "webroot");
@@ -254,7 +255,7 @@ public class MicroTomcatTest {
         when(testSocket.getOutputStream()).thenReturn(testOutput);
         
         // 处理请求
-        testServer.handleRequest(testSocket);
+        ((Http11Protocol)testServer.getProtocol()).handleRequest(testSocket);
         
         String response = testOutput.toString();
         System.out.println("Complete response:\n" + response);
@@ -270,7 +271,7 @@ public class MicroTomcatTest {
 
     @Test
     void testAddContextWithNullValues() throws Exception {
-        MicroTomcat server = new MicroTomcat(8080);
+        MicroTomcat server = new MicroTomcat(5635);
         
         // 测试 null 值
         assertThrows(IllegalArgumentException.class, () -> {
@@ -284,7 +285,7 @@ public class MicroTomcatTest {
 
     @Test
     void testAddServletWithNullValues() throws Exception {
-        MicroTomcat server = new MicroTomcat(8080);
+        MicroTomcat server = new MicroTomcat(5636);
         Context context = server.addContext("", "webroot");
         
         // 测试 null 值

@@ -1,8 +1,6 @@
 package com.microtomcat;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ExecutorService;
@@ -11,16 +9,17 @@ import java.util.concurrent.TimeUnit;
 
 import com.microtomcat.server.ServerConfig;
 import com.microtomcat.server.AbstractHttpServer;
-import com.microtomcat.server.HttpServerFactory;
-import com.microtomcat.loader.ClassLoaderManager;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.context.Context;
-import com.microtomcat.connector.Request;
-import com.microtomcat.connector.Response;
+import com.microtomcat.container.Context;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.context.SimpleServletContext;
-import javax.servlet.http.HttpServletResponse;
+import com.microtomcat.servlet.DefaultServlet;
+
 import javax.servlet.Servlet;
+import com.microtomcat.protocol.Protocol;
+import com.microtomcat.protocol.Http11Protocol;
+
+//TODO: connector -> protocol handler -> protocol
 
 public class MicroTomcat extends AbstractHttpServer {
     private static final int DEFAULT_PORT = 8080;
@@ -29,17 +28,25 @@ public class MicroTomcat extends AbstractHttpServer {
     private final ExecutorService executorService;
     private Context context;
     private SessionManager sessionManager;
-    private volatile ServerSocket serverSocket;
+    private Protocol protocol;
 
     public MicroTomcat(int port) throws IOException {
         super(new ServerConfig(port, false, 10, WEB_ROOT));
         this.port = port;
         this.executorService = Executors.newFixedThreadPool(10);
         this.sessionManager = new SessionManager(new SimpleServletContext(""));
+        
+        Http11Protocol http11Protocol = new Http11Protocol();
+        http11Protocol.setSessionManager(sessionManager);
+        http11Protocol.setPort(port);
+        this.protocol = http11Protocol;
     }
 
     public void setContext(Context context) {
         this.context = context;
+        if (protocol instanceof Http11Protocol) {
+            ((Http11Protocol) protocol).setContext(context);
+        }
     }
 
     @Override
@@ -51,90 +58,15 @@ public class MicroTomcat extends AbstractHttpServer {
     @Override
     public void start() throws LifecycleException {
         try {
-            ClassLoaderManager.init();
+            // 启动协议处理器
+            protocol.init();
+            protocol.start();
             
-            serverSocket = new ServerSocket(port);
-            log("Server started on port: " + port);
-            
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    Socket socket = serverSocket.accept();
-                    log("New connection accepted from: " + socket.getInetAddress());
-                    executorService.execute(() -> {
-                        try {
-                            handleRequest(socket);
-                        } catch (Exception e) {
-                            log("Error processing request: " + e.getMessage());
-                        } finally {
-                            try {
-                                socket.close();
-                            } catch (IOException e) {
-                                log("Error closing socket: " + e.getMessage());
-                            }
-                        }
-                    });
-                } catch (IOException e) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        break;
-                    }
-                    throw e;
-                }
-            }
         } catch (Exception e) {
             throw new LifecycleException("Failed to start server", e);
         }
     }
 
-    protected void handleRequest(Socket socket) throws IOException {
-        try (InputStream input = socket.getInputStream();
-             OutputStream output = socket.getOutputStream()) {
-            
-            Request request = new Request(input, sessionManager);
-            Response response = new Response(output);
-            
-            request.parse();
-            
-            log("Handling request: " + request.getRequestURI());
-            
-            Context context = this.context;
-            log("Using context: " + (context != null ? context.getName() : "null"));
-            
-            if (context != null) {
-                try {
-                    request.setContext(context);
-                    context.invoke(request, response);
-                    if (!response.isCommitted()) {
-                        response.setStatus(HttpServletResponse.SC_OK);
-                    }
-                } catch (Exception e) {
-                    log("Error processing request: " + e.getMessage());
-                    response.setContentType("text/plain");
-                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    String errorMsg = "500 Internal Server Error: " + e.getMessage() + "\n";
-                    output.write(errorMsg.getBytes());
-                }
-            } else {
-                response.setContentType("text/plain");
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                String errorMsg = "404 Not Found: " + request.getRequestURI() + "\n";
-                output.write(errorMsg.getBytes());
-            }
-            response.flushBuffer();
-        }
-    }
-
-    private String getContentType(String uri) {
-        if (uri.endsWith(".html")) {
-            return "text/html";
-        } else if (uri.endsWith(".txt")) {
-            return "text/plain";
-        } else if (uri.endsWith(".css")) {
-            return "text/css";
-        } else if (uri.endsWith(".js")) {
-            return "application/javascript";
-        }
-        return "application/octet-stream";
-    }
 
     @Override
     protected void initInternal() throws LifecycleException {
@@ -170,6 +102,11 @@ public class MicroTomcat extends AbstractHttpServer {
             String docBase = "webroot";
             Context context = tomcat.addContext(contextPath, docBase);
             
+            // 添加 DefaultServlet 处理静态资源
+            DefaultServlet defaultServlet = new DefaultServlet();
+            tomcat.addServlet(context, "default", defaultServlet);
+            tomcat.addServletMapping(context, "/*", "default");
+            
             // 启动服务器
             tomcat.init();
             tomcat.start();
@@ -186,13 +123,13 @@ public class MicroTomcat extends AbstractHttpServer {
     @Override
     public void stop() throws LifecycleException {
         try {
-            if (serverSocket != null) {
-                serverSocket.close();
+            if (protocol != null) {
+                protocol.stop();
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             log("Error while stopping server: " + e.getMessage());
         }
-        // 保持原有的线程池关闭逻辑
+        
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();
             try {
@@ -217,6 +154,7 @@ public class MicroTomcat extends AbstractHttpServer {
         }
         Context newContext = new Context(contextPath, docBase);
         this.context = newContext;
+        this.setContext(context);
         return newContext;
     }
 
@@ -259,8 +197,7 @@ public class MicroTomcat extends AbstractHttpServer {
         context.addServletMapping(urlPattern, servletName);
     }
 
-    public void addServlet(Context context, String servletName, Servlet servlet, String urlPattern) {
-        addServlet(context, servletName, servlet);
-        addServletMapping(context, urlPattern, servletName);
+    public Protocol getProtocol() {
+        return protocol;
     }
 }

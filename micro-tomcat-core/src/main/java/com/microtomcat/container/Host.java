@@ -3,7 +3,7 @@ package com.microtomcat.container;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.context.Context;
+
 import java.io.IOException;
 
 public class Host extends ContainerBase {

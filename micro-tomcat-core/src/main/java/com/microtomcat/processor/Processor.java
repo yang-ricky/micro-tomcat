@@ -4,27 +4,19 @@ import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.container.Engine;
 import com.microtomcat.container.Host;
-import com.microtomcat.context.Context;
+import com.microtomcat.container.Context;
 import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.pipeline.Pipeline;
-import com.microtomcat.pipeline.StandardPipeline;
-import com.microtomcat.pipeline.valve.AccessLogValve;
-import com.microtomcat.pipeline.valve.AuthenticatorValve;
-import com.microtomcat.pipeline.valve.StandardValve;
 import com.microtomcat.session.Session;
 import com.microtomcat.session.SessionManager;
 import com.microtomcat.session.distributed.DistributedSessionManager;
 import com.microtomcat.session.distributed.InMemoryReplicatedSessionStore;
 
-import javax.servlet.ServletException;
 import java.io.*;
 import java.net.Socket;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.container.Engine;
-import com.microtomcat.container.Host;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 
 public class Processor extends LifecycleBase {
     private final String webRoot;
@@ -178,6 +170,62 @@ public class Processor extends LifecycleBase {
         } catch (Exception e) {
             e.printStackTrace();
             response.sendError(500, "Internal Server Error: " + e.getMessage());
+        }
+    }
+
+    public void processNio(SelectionKey key, ByteBuffer buffer) throws IOException {
+        SocketChannel channel = (SocketChannel) key.channel();
+        Response response = new Response(new ChannelOutputStream(channel));
+        
+        try {
+            Request request = new Request(new ByteBufferInputStream(buffer), sessionManager);
+            request.parse();
+            engine.invoke(request, response);
+        } catch (Exception e) {
+            log("Error processing NIO request: " + e.getMessage());
+            response.sendError(500, "Internal Server Error: " + e.getMessage());
+        }
+    }
+
+    private static class ByteBufferInputStream extends InputStream {
+        private final ByteBuffer buffer;
+        
+        ByteBufferInputStream(ByteBuffer buffer) {
+            this.buffer = buffer;
+        }
+        
+        @Override
+        public int read() {
+            if (!buffer.hasRemaining()) {
+                return -1;
+            }
+            return buffer.get() & 0xFF;
+        }
+    }
+
+    private static class ChannelOutputStream extends OutputStream {
+        private final SocketChannel channel;
+        private final ByteBuffer buffer = ByteBuffer.allocate(8192);
+        
+        ChannelOutputStream(SocketChannel channel) {
+            this.channel = channel;
+        }
+        
+        @Override
+        public void write(int b) throws IOException {
+            if (!buffer.hasRemaining()) {
+                flush();
+            }
+            buffer.put((byte) b);
+        }
+        
+        @Override
+        public void flush() throws IOException {
+            buffer.flip();
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
+            }
+            buffer.clear();
         }
     }
 } 

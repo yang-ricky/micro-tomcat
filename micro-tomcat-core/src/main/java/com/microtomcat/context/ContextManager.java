@@ -3,6 +3,8 @@ package com.microtomcat.context;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.microtomcat.container.Context;
 import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.lifecycle.LifecycleException;
 public class ContextManager extends LifecycleBase {

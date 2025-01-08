@@ -1,7 +1,5 @@
 package com.microtomcat.processor;
 
-import com.microtomcat.servlet.ServletLoader;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -12,11 +10,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import com.microtomcat.session.SessionManager;
-import com.microtomcat.context.Context;
-import com.microtomcat.context.ContextManager;
-import com.microtomcat.processor.ProcessorPoolMBean;
+import com.microtomcat.container.Context;
 
-import java.io.IOException;
 import com.microtomcat.lifecycle.LifecycleBase;
 import com.microtomcat.lifecycle.LifecycleException;
 import com.microtomcat.container.Container;

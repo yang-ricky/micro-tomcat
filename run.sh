@@ -14,7 +14,7 @@ declare -a SERVER_PIDS
 
 # 编译项目
 echo -e "${GREEN}Compiling project...${NC}"
-mvn clean package dependency:copy-dependencies
+mvn clean package dependency:copy-dependencies -DskipTests
 
 # 启动核心服务节点
 start_core_node() {

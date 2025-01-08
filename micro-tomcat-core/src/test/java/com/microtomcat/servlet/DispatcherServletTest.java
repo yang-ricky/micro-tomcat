@@ -1,6 +1,6 @@
 package com.microtomcat.servlet;
 
-import com.microtomcat.context.Context;
+import com.microtomcat.container.Context;
 import org.junit.Before;
 import org.junit.After;
 import org.junit.Test;

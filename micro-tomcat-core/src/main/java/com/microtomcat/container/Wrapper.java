@@ -3,17 +3,12 @@ package com.microtomcat.container;
 import com.microtomcat.connector.Request;
 import com.microtomcat.connector.Response;
 import com.microtomcat.lifecycle.LifecycleException;
-import com.microtomcat.context.Context;
 import com.microtomcat.connector.ServletRequestWrapper;
 import com.microtomcat.connector.ServletResponseWrapper;
 import javax.servlet.*;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class Wrapper extends ContainerBase {
     private final String servletClass;
